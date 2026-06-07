@@ -67,3 +67,23 @@ body {
 .fade-up {
   animation: fade-up 0.4s ease-out forwards;
 }
+
+@keyframes player-card-loading {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 0 0 0 rgba(242, 202, 80, 0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+    box-shadow: 0 0 0 1px rgba(242, 202, 80, 0.24),
+      0 12px 28px rgba(0, 0, 0, 0.22);
+  }
+}
+
+.player-card-loading {
+  min-height: 148px;
+  animation: player-card-loading 1.05s ease-in-out infinite;
+}

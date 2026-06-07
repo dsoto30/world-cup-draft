@@ -42,20 +42,26 @@ function PitchSVG() {
   )
 }
 
-function SlotButton({ slot, filled, isSelected, onClick }: {
-  slot: PositionSlot; filled: WCPlayer | undefined; isSelected: boolean; onClick: () => void
+function SlotButton({ slot, filled, isSelected, isLocked, onClick }: {
+  slot: PositionSlot
+  filled: WCPlayer | undefined
+  isSelected: boolean
+  isLocked: boolean
+  onClick: () => void
 }) {
   const color = POSITION_COLOR[slot.position]
   return (
     <button
       style={{ top: `${slot.topPct}%`, left: `${slot.leftPct}%`, color }}
       onClick={onClick}
+      disabled={isLocked}
       aria-label={`${slot.position}${filled ? ` — ${filled.fullName}` : ', empty'}`}
       aria-pressed={isSelected}
       className={[
         'absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center',
         'w-11 h-11 rounded-full border-2 transition-all duration-200 cursor-pointer',
         'font-body text-[9px] font-bold uppercase focus-visible:outline-2 focus-visible:outline-gold',
+        isLocked ? 'opacity-45 cursor-not-allowed hover:scale-100' : '',
         isSelected
           ? 'border-gold bg-gold/20 scale-110 slot-selected'
           : filled
@@ -72,6 +78,38 @@ function SlotButton({ slot, filled, isSelected, onClick }: {
         <span className="font-bold">{slot.position}</span>
       )}
     </button>
+  )
+}
+
+function PlayerLoading() {
+  return (
+    <div
+      className="grid grid-cols-2 gap-2.5 py-1"
+      aria-live="polite"
+      aria-label="Loading players"
+    >
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="player-card-loading rounded-lg border border-outline-dim bg-surface-container/70 p-3"
+          style={{ animationDelay: `${index * 120}ms` }}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="h-8 w-8 rounded-full bg-surface-highest/80" />
+            <div className="h-5 w-9 rounded bg-gold/15" />
+          </div>
+          <div className="mt-6 space-y-2">
+            <div className="h-3 w-3/4 rounded bg-surface-highest/80" />
+            <div className="h-2.5 w-1/2 rounded bg-surface-highest/60" />
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-1.5">
+            <div className="h-6 rounded bg-surface-high/80" />
+            <div className="h-6 rounded bg-surface-high/80" />
+            <div className="h-6 rounded bg-surface-high/80" />
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -154,23 +192,13 @@ function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
               {total} {slot.position} option{total === 1 ? '' : 's'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => fetchRandomTeam(slot.position)}
-            disabled={loading}
-            className="shrink-0 rounded border border-gold/40 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-gold transition-colors hover:border-gold hover:text-gold-bright disabled:opacity-40 cursor-pointer"
-          >
-            Reroll
-          </button>
         </div>
       </div>
 
       {/* Card grid */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="w-6 h-6 rounded-full border-2 border-outline-dim border-t-gold animate-spin" />
-          </div>
+          <PlayerLoading />
         ) : players.length === 0 ? (
           <p className="text-center text-on-surface-muted text-sm py-8">No players found</p>
         ) : (
@@ -293,6 +321,7 @@ export default function DraftPitch({ formation }: { formation: Formation }) {
                   slot={slot}
                   filled={filledSlots[slot.id]}
                   isSelected={selectedSlotId === slot.id}
+                  isLocked={selectedSlotId !== null && selectedSlotId !== slot.id}
                   onClick={() => setSelectedSlotId(slot.id)}
                 />
               ))}
