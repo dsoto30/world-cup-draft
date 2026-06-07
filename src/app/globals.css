@@ -1,26 +1,69 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-gold: #f2ca50;
+  --color-gold-dim: #d4af37;
+  --color-gold-bright: #ffe088;
+  --color-surface: #16130b;
+  --color-surface-low: #1f1b13;
+  --color-surface-container: #231f17;
+  --color-surface-high: #2d2a21;
+  --color-surface-highest: #38342b;
+  --color-surface-bright: #3d392f;
+  --color-on-surface: #eae1d4;
+  --color-on-surface-muted: #d0c5af;
+  --color-outline: #99907c;
+  --color-outline-dim: #4d4635;
+  --color-green-secondary: #86d89d;
+  --color-green-container: #006233;
+  --color-red-tertiary: #ffbfb8;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-anybody);
+  --font-body: var(--font-hanken);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #16130b;
+  color: #eae1d4;
+  font-family: var(--font-hanken), system-ui, sans-serif;
+}
+
+@keyframes pulse-slot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px #f2ca50, 0 0 12px 3px rgba(242, 202, 80, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 2px #f2ca50, 0 0 24px 8px rgba(242, 202, 80, 0.75);
+  }
+}
+
+.slot-selected {
+  animation: pulse-slot 2s ease-in-out infinite;
+}
+
+.card-glow:hover {
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.5),
+    0 0 20px 3px rgba(212, 175, 55, 0.2);
+}
+
+.card-active {
+  box-shadow: 0 0 0 2px #f2ca50, 0 0 24px 6px rgba(242, 202, 80, 0.35);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fade-up 0.4s ease-out forwards;
 }
