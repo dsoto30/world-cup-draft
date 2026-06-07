@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   type Formation,
@@ -8,26 +8,19 @@ import {
   buildSlots,
   POSITION_COLOR,
 } from '@/lib/formations'
-import { PLACEHOLDER_PLAYERS, type Player } from '@/lib/players'
+import type { WCPlayer } from '@/lib/queries'
 import PlayerCard from './player-card'
 import TeamComplete from './team-complete'
 
 function PitchSVG() {
   const s = 'rgba(255,255,255,0.18)'
   return (
-    <svg
-      viewBox="0 0 100 150"
-      xmlns="http://www.w3.org/2000/svg"
-      className="absolute inset-0 w-full h-full"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
+    <svg viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg"
+      className="absolute inset-0 w-full h-full" preserveAspectRatio="none" aria-hidden>
       <defs>
         <linearGradient id="pitchGradDraft" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#1a4a1a" />
-          <stop offset="30%" stopColor="#1e5218" />
-          <stop offset="70%" stopColor="#1e5218" />
-          <stop offset="100%" stopColor="#1a4a1a" />
+          <stop offset="0%" stopColor="#1a4a1a" /><stop offset="30%" stopColor="#1e5218" />
+          <stop offset="70%" stopColor="#1e5218" /><stop offset="100%" stopColor="#1a4a1a" />
         </linearGradient>
       </defs>
       <rect width="100" height="150" fill="url(#pitchGradDraft)" />
@@ -49,25 +42,20 @@ function PitchSVG() {
   )
 }
 
-interface SlotButtonProps {
-  slot: PositionSlot
-  filled: Player | undefined
-  isSelected: boolean
-  onClick: () => void
-}
-
-function SlotButton({ slot, filled, isSelected, onClick }: SlotButtonProps) {
+function SlotButton({ slot, filled, isSelected, onClick }: {
+  slot: PositionSlot; filled: WCPlayer | undefined; isSelected: boolean; onClick: () => void
+}) {
   const color = POSITION_COLOR[slot.position]
   return (
     <button
       style={{ top: `${slot.topPct}%`, left: `${slot.leftPct}%`, color }}
       onClick={onClick}
-      aria-label={`${slot.position} position${filled ? ` — ${filled.name}` : ', empty'}`}
+      aria-label={`${slot.position}${filled ? ` — ${filled.fullName}` : ', empty'}`}
       aria-pressed={isSelected}
       className={[
         'absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center',
         'w-11 h-11 rounded-full border-2 transition-all duration-200 cursor-pointer',
-        'font-body text-[9px] font-bold uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold',
+        'font-body text-[9px] font-bold uppercase focus-visible:outline-2 focus-visible:outline-gold',
         isSelected
           ? 'border-gold bg-gold/20 scale-110 slot-selected'
           : filled
@@ -78,9 +66,7 @@ function SlotButton({ slot, filled, isSelected, onClick }: SlotButtonProps) {
       {filled ? (
         <>
           <span className="text-gold text-sm font-bold leading-none">{filled.rating}</span>
-          <span className="text-[8px] font-bold" style={{ color }}>
-            {slot.position}
-          </span>
+          <span className="text-[8px] font-bold" style={{ color }}>{slot.position}</span>
         </>
       ) : (
         <span className="font-bold">{slot.position}</span>
@@ -89,29 +75,162 @@ function SlotButton({ slot, filled, isSelected, onClick }: SlotButtonProps) {
   )
 }
 
+interface PlayerPanelProps {
+  slot: PositionSlot
+  onConfirm: (player: WCPlayer) => void
+}
+
+interface RandomTeamContext {
+  tournamentId: string
+  tournamentYear: number
+  teamId: string
+  teamName: string
+  teamCode: string
+}
+
+interface RandomTeamResponse {
+  players: WCPlayer[]
+  total: number
+  context: RandomTeamContext | null
+}
+
+function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
+  const [players, setPlayers]       = useState<WCPlayer[]>([])
+  const [total, setTotal]           = useState(0)
+  const [context, setContext]       = useState<RandomTeamContext | null>(null)
+  const [loading, setLoading]       = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const fetchRandomTeam = useCallback(
+    async (pos: string) => {
+      setLoading(true)
+      setSelectedId(null)
+      try {
+        const res = await fetch(`/api/players?mode=randomTeam&position=${pos}`)
+        const data = (await res.json()) as RandomTeamResponse
+        setPlayers(data.players)
+        setTotal(data.total)
+        setContext(data.context)
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetchRandomTeam(slot.position)
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [slot.id, slot.position, fetchRandomTeam])
+
+  const selectedPlayer = players.find((p) => p.playerId === selectedId)
+  const color = POSITION_COLOR[slot.position]
+
+  return (
+    <>
+      {/* Panel header */}
+      <div className="flex items-center gap-3 shrink-0">
+        <h2 className="font-display text-lg font-bold text-on-surface uppercase">Select a Player</h2>
+        <span className="px-2 py-0.5 rounded text-xs font-bold border"
+          style={{ color, borderColor: `${color}55` }}>
+          {slot.position}
+        </span>
+      </div>
+
+      {/* Random squad context */}
+      <div className="shrink-0 rounded-lg border border-outline-dim bg-surface-container/60 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-muted">
+              Random World Cup Squad
+            </p>
+            <p className="mt-1 font-display text-base font-bold uppercase text-on-surface">
+              {context ? `${context.tournamentYear} ${context.teamName}` : 'Drawing squad...'}
+            </p>
+            <p className="text-xs text-on-surface-muted">
+              {total} {slot.position} option{total === 1 ? '' : 's'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchRandomTeam(slot.position)}
+            disabled={loading}
+            className="shrink-0 rounded border border-gold/40 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-gold transition-colors hover:border-gold hover:text-gold-bright disabled:opacity-40 cursor-pointer"
+          >
+            Reroll
+          </button>
+        </div>
+      </div>
+
+      {/* Card grid */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="w-6 h-6 rounded-full border-2 border-outline-dim border-t-gold animate-spin" />
+          </div>
+        ) : players.length === 0 ? (
+          <p className="text-center text-on-surface-muted text-sm py-8">No players found</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5" role="listbox" aria-label="Available players">
+            {players.map((player) => {
+              const isChosen = selectedId === player.playerId
+              return (
+                <button
+                  key={player.playerId}
+                  role="option"
+                  aria-selected={isChosen}
+                  onClick={() => setSelectedId(player.playerId)}
+                  className={[
+                    'rounded-lg overflow-hidden border transition-all duration-200 cursor-pointer text-left h-full',
+                    isChosen
+                      ? 'border-gold scale-[1.02]'
+                      : 'border-outline-dim hover:border-gold/40',
+                  ].join(' ')}
+                  style={isChosen ? { boxShadow: '0 0 0 2px #f2ca50, 0 4px 20px rgba(242,202,80,0.2)' } : undefined}
+                >
+                  <PlayerCard player={player} />
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Confirm */}
+      <button
+        onClick={() => selectedPlayer && onConfirm(selectedPlayer)}
+        disabled={!selectedPlayer}
+        className={[
+          'w-full py-3 rounded font-body font-bold text-sm uppercase tracking-widest transition-all duration-200 shrink-0',
+          selectedPlayer
+            ? 'bg-gold text-[#3c2f00] hover:bg-gold-bright cursor-pointer'
+            : 'bg-surface-high text-on-surface-muted cursor-not-allowed opacity-60',
+        ].join(' ')}
+      >
+        Confirm Pick
+      </button>
+    </>
+  )
+}
+
 export default function DraftPitch({ formation }: { formation: Formation }) {
   const slots = buildSlots(formation)
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
-  const [filledSlots, setFilledSlots] = useState<Record<string, Player>>({})
-  const [showComplete, setShowComplete] = useState(false)
-  const [autoComplete, setAutoComplete] = useState(true)
+  const [filledSlots, setFilledSlots]        = useState<Record<string, WCPlayer>>({})
+  const [showComplete, setShowComplete]      = useState(false)
+  const [autoComplete, setAutoComplete]      = useState(true)
 
   const selectedSlot = slots.find((s) => s.id === selectedSlotId) ?? null
-  const selectedCard = PLACEHOLDER_PLAYERS.find((p) => p.id === selectedCardId) ?? null
-  const filledCount = Object.keys(filledSlots).length
+  const filledCount  = Object.keys(filledSlots).length
 
-  function handleSlotClick(slot: PositionSlot) {
-    setSelectedSlotId(slot.id)
-    setSelectedCardId(null)
-  }
-
-  function handleConfirmPick() {
-    if (!selectedSlotId || !selectedCard) return
-    const next = { ...filledSlots, [selectedSlotId]: selectedCard }
+  function handleConfirmPick(player: WCPlayer) {
+    if (!selectedSlotId) return
+    const next = { ...filledSlots, [selectedSlotId]: player }
     setFilledSlots(next)
     setSelectedSlotId(null)
-    setSelectedCardId(null)
     if (Object.keys(next).length === slots.length && autoComplete) {
       setTimeout(() => setShowComplete(true), 350)
     }
@@ -120,39 +239,35 @@ export default function DraftPitch({ formation }: { formation: Formation }) {
   function handleReset() {
     setFilledSlots({})
     setSelectedSlotId(null)
-    setSelectedCardId(null)
     setShowComplete(false)
     setAutoComplete(true)
-  }
-
-  function handleEditSquad() {
-    setShowComplete(false)
-    setAutoComplete(false)
   }
 
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-dim bg-surface-container">
-        <Link
-          href="/"
-          className="font-display text-base font-bold text-on-surface uppercase tracking-tight hover:text-gold transition-colors"
-        >
+      <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-dim bg-surface-container shrink-0">
+        <Link href="/"
+          className="font-display text-base font-bold text-on-surface uppercase tracking-tight hover:text-gold transition-colors">
           ← WC Legends Draft
         </Link>
-        <span className="px-3 py-1 rounded-full border border-gold/40 bg-gold/10 text-gold text-sm font-bold">
-          {formation.label}
-        </span>
+        <div className="flex items-center gap-3">
+          <Link href="/players"
+            className="text-on-surface-muted hover:text-gold text-xs font-bold uppercase tracking-widest transition-colors hidden sm:block">
+            Player DB
+          </Link>
+          <span className="px-3 py-1 rounded-full border border-gold/40 bg-gold/10 text-gold text-sm font-bold">
+            {formation.label}
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           {!showComplete && (
             <span className="text-on-surface-muted text-xs font-body hidden sm:block">
-              {filledCount}/{slots.length} picked
+              {filledCount}/{slots.length}
             </span>
           )}
-          <button
-            onClick={handleReset}
-            className="text-on-surface-muted hover:text-on-surface text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer"
-          >
+          <button onClick={handleReset}
+            className="text-on-surface-muted hover:text-on-surface text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer">
             Reset
           </button>
         </div>
@@ -163,16 +278,14 @@ export default function DraftPitch({ formation }: { formation: Formation }) {
           formation={formation}
           filledSlots={filledSlots}
           slots={slots}
-          onEdit={handleEditSquad}
+          onEdit={() => { setShowComplete(false); setAutoComplete(false) }}
         />
       ) : (
         <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
           {/* Pitch */}
           <div className="flex-1 flex items-start justify-center">
-            <div
-              className="relative w-full rounded-xl overflow-hidden shadow-2xl"
-              style={{ maxWidth: '380px', aspectRatio: '2/3' }}
-            >
+            <div className="relative w-full rounded-xl overflow-hidden shadow-2xl"
+              style={{ maxWidth: '380px', aspectRatio: '2/3' }}>
               <PitchSVG />
               {slots.map((slot) => (
                 <SlotButton
@@ -180,79 +293,28 @@ export default function DraftPitch({ formation }: { formation: Formation }) {
                   slot={slot}
                   filled={filledSlots[slot.id]}
                   isSelected={selectedSlotId === slot.id}
-                  onClick={() => handleSlotClick(slot)}
+                  onClick={() => setSelectedSlotId(slot.id)}
                 />
               ))}
             </div>
           </div>
 
           {/* Player panel */}
-          <aside className="lg:w-[360px] flex flex-col gap-4" aria-label="Player selection panel">
+          <aside className="lg:w-[360px] flex flex-col gap-3 min-h-0" aria-label="Player selection">
             {selectedSlot ? (
-              <>
-                <div className="flex items-center gap-3">
-                  <h2 className="font-display text-lg font-bold text-on-surface uppercase">
-                    Select a Player
-                  </h2>
-                  <span
-                    className="px-2 py-0.5 rounded text-xs font-bold border"
-                    style={{
-                      color: POSITION_COLOR[selectedSlot.position],
-                      borderColor: `${POSITION_COLOR[selectedSlot.position]}55`,
-                    }}
-                  >
-                    {selectedSlot.position}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3" role="listbox" aria-label="Available players">
-                  {PLACEHOLDER_PLAYERS.map((player) => {
-                    const isChosen = selectedCardId === player.id
-                    return (
-                      <button
-                        key={player.id}
-                        role="option"
-                        aria-selected={isChosen}
-                        onClick={() => setSelectedCardId(player.id)}
-                        className={[
-                          'rounded-lg overflow-hidden border transition-all duration-200 cursor-pointer text-left',
-                          isChosen
-                            ? 'border-gold scale-[1.03]'
-                            : 'border-outline-dim hover:border-gold/40 hover:scale-[1.01]',
-                        ].join(' ')}
-                        style={
-                          isChosen
-                            ? { boxShadow: '0 0 0 2px #f2ca50, 0 4px 20px rgba(242,202,80,0.25)' }
-                            : undefined
-                        }
-                      >
-                        <PlayerCard player={player} />
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <button
-                  onClick={handleConfirmPick}
-                  disabled={!selectedCard}
-                  className={[
-                    'w-full py-3 rounded font-body font-bold text-sm uppercase tracking-widest transition-all duration-200',
-                    selectedCard
-                      ? 'bg-gold text-[#3c2f00] hover:bg-gold-bright cursor-pointer'
-                      : 'bg-surface-high text-on-surface-muted cursor-not-allowed opacity-60',
-                  ].join(' ')}
-                >
-                  Confirm Pick
-                </button>
-              </>
+              <PlayerPanel slot={selectedSlot} onConfirm={handleConfirmPick} />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-4 rounded-xl border border-outline-dim bg-surface-container/30 p-8 text-center min-h-[200px]">
                 <div className="w-14 h-14 rounded-full border-2 border-outline-dim flex items-center justify-center">
                   <span className="text-outline text-xl font-bold leading-none">+</span>
                 </div>
                 <p className="text-on-surface-muted font-body text-sm leading-relaxed">
-                  Tap a position slot on the pitch to select a player
+                  Tap a position slot on the pitch to pick a player
                 </p>
+                <Link href="/players"
+                  className="text-gold text-xs font-bold uppercase tracking-widest hover:text-gold-bright transition-colors">
+                  Browse Player Database →
+                </Link>
               </div>
             )}
           </aside>

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { type Formation, type PositionSlot, type Position, POSITION_COLOR } from '@/lib/formations'
-import { type Player } from '@/lib/players'
+import type { WCPlayer } from '@/lib/queries'
 
 const POSITION_ORDER: Position[] = ['FWD', 'MD', 'DF', 'GK']
 
@@ -44,7 +44,7 @@ function PitchSVG() {
 
 interface Props {
   formation: Formation
-  filledSlots: Record<string, Player>
+  filledSlots: Record<string, WCPlayer>
   slots: PositionSlot[]
   onEdit: () => void
 }
