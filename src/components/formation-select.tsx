@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { FORMATIONS } from '@/lib/formations'
 import FormationDiagram from './formation-diagram'
 
@@ -68,14 +69,22 @@ export default function FormationSelect() {
         })}
       </div>
 
-      {/* CTA */}
-      <button
-        onClick={() => router.push(`/draft?formation=${selected}`)}
-        className="relative z-10 px-12 py-4 bg-gold text-[#3c2f00] font-body font-bold text-sm uppercase tracking-widest rounded hover:bg-gold-bright transition-all duration-200 shadow-lg"
-        style={{ boxShadow: '0 4px 24px rgba(242,202,80,0.25)' }}
-      >
-        Build My Squad
-      </button>
+      {/* CTAs */}
+      <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4">
+        <button
+          onClick={() => router.push(`/draft?formation=${selected}`)}
+          className="px-12 py-4 bg-gold text-[#3c2f00] font-body font-bold text-sm uppercase tracking-widest rounded hover:bg-gold-bright transition-all duration-200 shadow-lg"
+          style={{ boxShadow: '0 4px 24px rgba(242,202,80,0.25)' }}
+        >
+          Build My Squad
+        </button>
+        <Link
+          href="/players"
+          className="px-8 py-4 border border-outline-dim text-on-surface-muted font-body font-bold text-sm uppercase tracking-widest rounded hover:border-gold/50 hover:text-on-surface transition-all duration-200"
+        >
+          Player Database
+        </Link>
+      </div>
     </div>
   )
 }

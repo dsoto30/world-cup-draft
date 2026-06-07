@@ -40,5 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# database (binary, download from jfjelstul/worldcup)
+*.db
+
 
 .claude/
+SQL-schema.txt
