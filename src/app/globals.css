@@ -92,6 +92,11 @@ html {
   scroll-behavior: smooth;
 }
 
+.world-cup-scene canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .landing-stadium {
   background:
     linear-gradient(180deg, rgba(22, 19, 11, 0.2) 0%, #16130b 92%),
