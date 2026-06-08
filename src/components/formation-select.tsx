@@ -15,7 +15,7 @@ export default function FormationSelect() {
       {/* Atmospheric background glow */}
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0"
+        className="pointer-events-none absolute inset-0"
         style={{
           background:
             'radial-gradient(ellipse 80% 50% at 50% 20%, rgba(212,175,55,0.07) 0%, transparent 70%), radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%)',

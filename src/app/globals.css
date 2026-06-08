@@ -87,3 +87,112 @@ body {
   min-height: 148px;
   animation: player-card-loading 1.05s ease-in-out infinite;
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
+.landing-stadium {
+  background:
+    linear-gradient(180deg, rgba(22, 19, 11, 0.2) 0%, #16130b 92%),
+    radial-gradient(ellipse 34% 16% at 20% 14%, rgba(242, 202, 80, 0.32), transparent 72%),
+    radial-gradient(ellipse 34% 16% at 80% 14%, rgba(134, 216, 157, 0.24), transparent 72%),
+    radial-gradient(ellipse 70% 36% at 50% 83%, rgba(0, 98, 51, 0.76), transparent 70%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.08) 0 1px,
+      transparent 1px 54px
+    ),
+    #16130b;
+}
+
+.landing-stadium::before,
+.landing-stadium::after {
+  content: "";
+  position: absolute;
+  top: 12%;
+  width: 34%;
+  height: 46%;
+  background: linear-gradient(
+    105deg,
+    rgba(255, 224, 136, 0.22),
+    rgba(255, 224, 136, 0.05) 48%,
+    transparent 72%
+  );
+  filter: blur(2px);
+  transform-origin: top center;
+  animation: stadium-light 4.8s ease-in-out infinite;
+}
+
+.landing-stadium::before {
+  left: 7%;
+  transform: skewX(18deg);
+}
+
+.landing-stadium::after {
+  right: 7%;
+  transform: skewX(-18deg) scaleX(-1);
+  animation-delay: 1.1s;
+}
+
+@keyframes stadium-light {
+  0%,
+  100% {
+    opacity: 0.42;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes flag-wave {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg) skewY(0deg);
+  }
+  50% {
+    transform: translateY(5px) rotate(3deg) skewY(4deg);
+  }
+}
+
+.landing-flag {
+  animation: flag-wave 2.8s ease-in-out infinite;
+  transform-origin: 50% 0%;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -12vh, 0) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(34px, 108vh, 0) rotate(420deg);
+  }
+}
+
+.landing-confetti {
+  position: absolute;
+  top: -8%;
+  width: 10px;
+  height: 18px;
+  border-radius: 2px;
+  animation: confetti-fall linear infinite;
+}
+
+@keyframes ball-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(10deg);
+  }
+}
+
+.landing-ball {
+  animation: ball-bounce 2.4s ease-in-out infinite;
+}

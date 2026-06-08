@@ -9,7 +9,6 @@ import {
   POSITION_COLOR,
 } from '@/lib/formations'
 import type { WCPlayer } from '@/lib/queries'
-import PlayerCard from './player-card'
 import TeamComplete from './team-complete'
 
 function PitchSVG() {
@@ -59,8 +58,9 @@ function SlotButton({ slot, filled, isSelected, isLocked, onClick }: {
       aria-pressed={isSelected}
       className={[
         'absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center',
-        'w-11 h-11 rounded-full border-2 transition-all duration-200 cursor-pointer',
-        'font-body text-[9px] font-bold uppercase focus-visible:outline-2 focus-visible:outline-gold',
+        'rounded-lg border-2 transition-all duration-200 cursor-pointer px-1',
+        'font-body font-bold uppercase focus-visible:outline-2 focus-visible:outline-gold',
+        filled ? 'w-14 h-12' : 'w-11 h-11 rounded-full',
         isLocked ? 'opacity-45 cursor-not-allowed hover:scale-100' : '',
         isSelected
           ? 'border-gold bg-gold/20 scale-110 slot-selected'
@@ -71,11 +71,13 @@ function SlotButton({ slot, filled, isSelected, isLocked, onClick }: {
     >
       {filled ? (
         <>
-          <span className="text-gold text-sm font-bold leading-none">{filled.rating}</span>
-          <span className="text-[8px] font-bold" style={{ color }}>{slot.position}</span>
+          <span className="text-gold text-[11px] font-bold leading-none">{filled.rating}</span>
+          <span className="text-[7px] font-bold leading-none mt-0.5 truncate w-full text-center" style={{ color }}>
+            {filled.familyName.length > 7 ? filled.familyName.slice(0, 7) + '…' : filled.familyName}
+          </span>
         </>
       ) : (
-        <span className="font-bold">{slot.position}</span>
+        <span className="text-[9px] font-bold">{slot.position}</span>
       )}
     </button>
   )
@@ -83,30 +85,16 @@ function SlotButton({ slot, filled, isSelected, isLocked, onClick }: {
 
 function PlayerLoading() {
   return (
-    <div
-      className="grid grid-cols-2 gap-2.5 py-1"
-      aria-live="polite"
-      aria-label="Loading players"
-    >
-      {Array.from({ length: 4 }).map((_, index) => (
+    <div className="flex flex-col gap-1 py-1" aria-live="polite" aria-label="Loading players">
+      {Array.from({ length: 5 }).map((_, i) => (
         <div
-          key={index}
-          className="player-card-loading rounded-lg border border-outline-dim bg-surface-container/70 p-3"
-          style={{ animationDelay: `${index * 120}ms` }}
+          key={i}
+          className="player-card-loading flex items-center gap-3 px-3 py-2.5 rounded-lg border border-outline-dim bg-surface-container/70"
+          style={{ animationDelay: `${i * 80}ms` }}
         >
-          <div className="flex items-start justify-between gap-2">
-            <div className="h-8 w-8 rounded-full bg-surface-highest/80" />
-            <div className="h-5 w-9 rounded bg-gold/15" />
-          </div>
-          <div className="mt-6 space-y-2">
-            <div className="h-3 w-3/4 rounded bg-surface-highest/80" />
-            <div className="h-2.5 w-1/2 rounded bg-surface-highest/60" />
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-1.5">
-            <div className="h-6 rounded bg-surface-high/80" />
-            <div className="h-6 rounded bg-surface-high/80" />
-            <div className="h-6 rounded bg-surface-high/80" />
-          </div>
+          <div className="h-5 w-8 rounded bg-gold/15 shrink-0" />
+          <div className="h-4 w-7 rounded bg-surface-highest/60 shrink-0" />
+          <div className="h-4 flex-1 rounded bg-surface-highest/80" />
         </div>
       ))}
     </div>
@@ -195,16 +183,21 @@ function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
         </div>
       </div>
 
-      {/* Card grid */}
+      {/* Player rows */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading ? (
           <PlayerLoading />
         ) : players.length === 0 ? (
           <p className="text-center text-on-surface-muted text-sm py-8">No players found</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5" role="listbox" aria-label="Available players">
+          <div className="flex flex-col gap-1" role="listbox" aria-label="Available players">
             {players.map((player) => {
               const isChosen = selectedId === player.playerId
+              const posColor = POSITION_COLOR[player.position]
+              const AWARD_ICON: Record<string, string> = {
+                'Golden Ball': '⭐', 'Golden Boot': '👟',
+                'Golden Glove': '🧤', 'Best Young Player': '🌟',
+              }
               return (
                 <button
                   key={player.playerId}
@@ -212,14 +205,37 @@ function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
                   aria-selected={isChosen}
                   onClick={() => setSelectedId(player.playerId)}
                   className={[
-                    'rounded-lg overflow-hidden border transition-all duration-200 cursor-pointer text-left h-full',
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all duration-150 cursor-pointer text-left',
                     isChosen
-                      ? 'border-gold scale-[1.02]'
-                      : 'border-outline-dim hover:border-gold/40',
+                      ? 'border-gold bg-gold/10'
+                      : 'border-outline-dim hover:border-gold/40 hover:bg-surface-container/60',
                   ].join(' ')}
-                  style={isChosen ? { boxShadow: '0 0 0 2px #f2ca50, 0 4px 20px rgba(242,202,80,0.2)' } : undefined}
+                  style={isChosen ? { boxShadow: '0 0 0 1px #f2ca50' } : undefined}
                 >
-                  <PlayerCard player={player} />
+                  <span className="font-display font-bold text-gold text-sm w-7 text-right shrink-0">
+                    ?
+                  </span>
+                  <span
+                    className="text-[10px] font-bold uppercase w-7 shrink-0 text-center"
+                    style={{ color: posColor }}
+                  >
+                    {player.position}
+                  </span>
+                  <span className="font-body text-on-surface text-sm flex-1 truncate">
+                    {player.fullName}
+                  </span>
+                  {player.awards.length > 0 && (
+                    <span className="flex gap-0.5 shrink-0">
+                      {player.awards.map((award) => (
+                        <span key={award} className="text-xs" title={award}>
+                          {AWARD_ICON[award] ?? '★'}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  {player.wonTournament && player.awards.length === 0 && (
+                    <span className="text-xs shrink-0" title="World Cup Winner">🏆</span>
+                  )}
                 </button>
               )
             })}
@@ -306,7 +322,6 @@ export default function DraftPitch({ formation }: { formation: Formation }) {
           formation={formation}
           filledSlots={filledSlots}
           slots={slots}
-          onEdit={() => { setShowComplete(false); setAutoComplete(false) }}
         />
       ) : (
         <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">

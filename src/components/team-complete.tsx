@@ -46,36 +46,53 @@ interface Props {
   formation: Formation
   filledSlots: Record<string, WCPlayer>
   slots: PositionSlot[]
-  onEdit: () => void
 }
 
-export default function TeamComplete({ formation, filledSlots, slots, onEdit }: Props) {
-  const [copied, setCopied] = useState(false)
+export default function TeamComplete({ formation, filledSlots, slots }: Props) {
+  const [status, setStatus] = useState<string | null>(null)
 
   const ratings = slots.map((s) => filledSlots[s.id]?.rating ?? 0)
   const overall = Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
 
-  const grouped = POSITION_ORDER.reduce<Record<Position, number[]>>(
+  const groupedPlayers = POSITION_ORDER.reduce<Record<Position, WCPlayer[]>>(
     (acc, pos) => ({ ...acc, [pos]: [] }),
     { GK: [], DF: [], MD: [], FWD: [] }
   )
   slots.forEach((s) => {
-    const r = filledSlots[s.id]?.rating
-    if (r != null) grouped[s.position].push(r)
+    const p = filledSlots[s.id]
+    if (p) groupedPlayers[s.position].push(p)
   })
 
-  async function handleShare() {
+  function getShareUrl() {
     const payload = { f: formation.id, r: ratings }
     const encoded = encodeURIComponent(btoa(JSON.stringify(payload)))
-    const url = `${window.location.origin}/view?d=${encoded}`
+    return `${window.location.origin}/view?d=${encoded}`
+  }
+
+  function setTemporaryStatus(nextStatus: string) {
+    setStatus(nextStatus)
+    window.setTimeout(() => setStatus(null), 2500)
+  }
+
+  async function copyShareUrl() {
+    const url = getShareUrl()
     try {
       await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2500)
+      setTemporaryStatus('Link copied')
     } catch {
-      // Fallback: open a prompt with the URL
       window.prompt('Copy your squad link:', url)
     }
+  }
+
+  async function handleTweet() {
+    await copyShareUrl()
+    const text = `I drafted a ${overall} rated ${formation.label} World Cup Legends squad. Can you beat it?`
+    const url = getShareUrl()
+    const intent = new URL('https://twitter.com/intent/tweet')
+    intent.searchParams.set('text', text)
+    intent.searchParams.set('url', url)
+    intent.searchParams.set('hashtags', 'WorldCupDraft')
+    window.open(intent.toString(), '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -142,48 +159,46 @@ export default function TeamComplete({ formation, filledSlots, slots, onEdit }: 
           </div>
         </div>
 
-        {/* Player roster by position */}
-        <div className="rounded-xl border border-outline-dim bg-surface-container p-4 space-y-3">
-          {POSITION_ORDER.filter((pos) => grouped[pos].length > 0).map((pos) => (
-            <div key={pos} className="flex items-center gap-3">
-              <span
-                className="w-9 text-center text-xs font-bold uppercase py-0.5 rounded border"
-                style={{
-                  color: POSITION_COLOR[pos],
-                  borderColor: `${POSITION_COLOR[pos]}44`,
-                  backgroundColor: `${POSITION_COLOR[pos]}11`,
-                }}
+        {/* Player XI roster */}
+        <div className="rounded-xl border border-outline-dim bg-surface-container overflow-hidden">
+          {POSITION_ORDER.filter((pos) => groupedPlayers[pos].length > 0).flatMap((pos) =>
+            groupedPlayers[pos].map((player, i) => (
+              <div
+                key={`${pos}-${i}`}
+                className="flex items-center gap-3 px-4 py-2.5"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
               >
-                {pos}
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {grouped[pos].map((rating, i) => (
-                  <span key={i} className="text-gold font-display font-bold text-sm">
-                    {rating}
-                    {i < grouped[pos].length - 1 && (
-                      <span className="text-outline-dim mx-1">·</span>
-                    )}
-                  </span>
-                ))}
+                <span className="font-display font-bold text-gold text-sm w-7 text-right shrink-0">
+                  {player.rating}
+                </span>
+                <span
+                  className="text-[10px] font-bold uppercase w-8 text-center shrink-0"
+                  style={{ color: POSITION_COLOR[pos] }}
+                >
+                  {pos}
+                </span>
+                <span className="font-body text-on-surface text-sm flex-1 truncate">
+                  {player.fullName}
+                </span>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Actions */}
         <div className="flex flex-col gap-3">
           <button
-            onClick={handleShare}
+            onClick={copyShareUrl}
             className="w-full py-3 rounded font-body font-bold text-sm uppercase tracking-widest transition-all duration-200 bg-gold text-[#3c2f00] hover:bg-gold-bright cursor-pointer"
             style={{ boxShadow: '0 4px 20px rgba(242,202,80,0.2)' }}
           >
-            {copied ? '✓ Link Copied!' : 'Share Squad'}
+            {status ?? 'Copy Squad Link'}
           </button>
           <button
-            onClick={onEdit}
-            className="w-full py-3 rounded font-body font-bold text-sm uppercase tracking-widest border border-outline-dim text-on-surface-muted hover:text-on-surface hover:border-outline transition-all duration-200 cursor-pointer"
+            onClick={handleTweet}
+            className="w-full py-3 rounded font-body font-bold text-xs uppercase tracking-widest border border-outline-dim text-on-surface-muted hover:text-on-surface hover:border-outline transition-all duration-200 cursor-pointer"
           >
-            Edit Squad
+            Tweet Squad
           </button>
           <Link
             href="/"

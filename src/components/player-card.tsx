@@ -82,7 +82,7 @@ export default function PlayerCard({ player }: { player: WCPlayer }) {
           <span className="text-outline-dim text-[9px]">·</span>
           <span className="text-on-surface-muted text-[9px]">{player.goals}G</span>
           <span className="text-outline-dim text-[9px]">·</span>
-          <span className="text-on-surface-muted text-[9px]">{player.appearances}A</span>
+          <span className="text-on-surface-muted text-[9px]">{player.appearances} Apps</span>
           {player.wonTournament && (
             <>
               <span className="text-outline-dim text-[9px]">·</span>
