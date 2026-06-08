@@ -103,6 +103,8 @@ function PlayerLoading() {
 
 interface PlayerPanelProps {
   slot: PositionSlot
+  filledSlots: Record<string, WCPlayer>
+  showRatingsDuringSelection: boolean
   onConfirm: (player: WCPlayer) => void
 }
 
@@ -120,7 +122,7 @@ interface RandomTeamResponse {
   context: RandomTeamContext | null
 }
 
-function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
+function PlayerPanel({ slot, filledSlots, showRatingsDuringSelection, onConfirm }: PlayerPanelProps) {
   const [players, setPlayers]       = useState<WCPlayer[]>([])
   const [total, setTotal]           = useState(0)
   const [context, setContext]       = useState<RandomTeamContext | null>(null)
@@ -152,7 +154,12 @@ function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
     return () => window.clearTimeout(timer)
   }, [slot.id, slot.position, fetchRandomTeam])
 
-  const selectedPlayer = players.find((p) => p.playerId === selectedId)
+  const pickedPlayerIds = new Set(
+    Object.entries(filledSlots)
+      .filter(([slotId]) => slotId !== slot.id)
+      .map(([, player]) => player.playerId),
+  )
+  const selectedPlayer = players.find((p) => p.playerId === selectedId && !pickedPlayerIds.has(p.playerId))
   const color = POSITION_COLOR[slot.position]
 
   return (
@@ -193,6 +200,7 @@ function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
           <div className="flex flex-col gap-1" role="listbox" aria-label="Available players">
             {players.map((player) => {
               const isChosen = selectedId === player.playerId
+              const isAlreadyPicked = pickedPlayerIds.has(player.playerId)
               const posColor = POSITION_COLOR[player.position]
               const AWARD_ICON: Record<string, string> = {
                 'Golden Ball': '⭐', 'Golden Boot': '👟',
@@ -203,17 +211,21 @@ function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
                   key={player.playerId}
                   role="option"
                   aria-selected={isChosen}
+                  aria-disabled={isAlreadyPicked}
+                  disabled={isAlreadyPicked}
                   onClick={() => setSelectedId(player.playerId)}
                   className={[
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all duration-150 cursor-pointer text-left',
-                    isChosen
+                    isAlreadyPicked
+                      ? 'border-outline-dim bg-surface-high/45 opacity-45 cursor-not-allowed'
+                      : isChosen
                       ? 'border-gold bg-gold/10'
                       : 'border-outline-dim hover:border-gold/40 hover:bg-surface-container/60',
                   ].join(' ')}
                   style={isChosen ? { boxShadow: '0 0 0 1px #f2ca50' } : undefined}
                 >
                   <span className="font-display font-bold text-gold text-sm w-7 text-right shrink-0">
-                    ?
+                    {showRatingsDuringSelection ? player.rating : '?'}
                   </span>
                   <span
                     className="text-[10px] font-bold uppercase w-7 shrink-0 text-center"
@@ -224,6 +236,11 @@ function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
                   <span className="font-body text-on-surface text-sm flex-1 truncate">
                     {player.fullName}
                   </span>
+                  {isAlreadyPicked && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-muted shrink-0">
+                      Picked
+                    </span>
+                  )}
                   {player.awards.length > 0 && (
                     <span className="flex gap-0.5 shrink-0">
                       {player.awards.map((award) => (
@@ -260,46 +277,45 @@ function PlayerPanel({ slot, onConfirm }: PlayerPanelProps) {
   )
 }
 
-export default function DraftPitch({ formation }: { formation: Formation }) {
+export default function DraftPitch({
+  formation,
+  showRatingsDuringSelection,
+}: {
+  formation: Formation
+  showRatingsDuringSelection: boolean
+}) {
   const slots = buildSlots(formation)
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
   const [filledSlots, setFilledSlots]        = useState<Record<string, WCPlayer>>({})
   const [showComplete, setShowComplete]      = useState(false)
-  const [autoComplete, setAutoComplete]      = useState(true)
 
   const selectedSlot = slots.find((s) => s.id === selectedSlotId) ?? null
   const filledCount  = Object.keys(filledSlots).length
 
   function handleConfirmPick(player: WCPlayer) {
     if (!selectedSlotId) return
+    const isDuplicatePick = Object.entries(filledSlots).some(
+      ([slotId, pickedPlayer]) => slotId !== selectedSlotId && pickedPlayer.playerId === player.playerId,
+    )
+    if (isDuplicatePick) return
+
     const next = { ...filledSlots, [selectedSlotId]: player }
     setFilledSlots(next)
     setSelectedSlotId(null)
-    if (Object.keys(next).length === slots.length && autoComplete) {
+    if (Object.keys(next).length === slots.length) {
       setTimeout(() => setShowComplete(true), 350)
     }
-  }
-
-  function handleReset() {
-    setFilledSlots({})
-    setSelectedSlotId(null)
-    setShowComplete(false)
-    setAutoComplete(true)
   }
 
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-dim bg-surface-container shrink-0">
-        <Link href="/"
+        <Link href="/formations"
           className="font-display text-base font-bold text-on-surface uppercase tracking-tight hover:text-gold transition-colors">
           ← WC Legends Draft
         </Link>
         <div className="flex items-center gap-3">
-          <Link href="/players"
-            className="text-on-surface-muted hover:text-gold text-xs font-bold uppercase tracking-widest transition-colors hidden sm:block">
-            Player DB
-          </Link>
           <span className="px-3 py-1 rounded-full border border-gold/40 bg-gold/10 text-gold text-sm font-bold">
             {formation.label}
           </span>
@@ -310,10 +326,6 @@ export default function DraftPitch({ formation }: { formation: Formation }) {
               {filledCount}/{slots.length}
             </span>
           )}
-          <button onClick={handleReset}
-            className="text-on-surface-muted hover:text-on-surface text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer">
-            Reset
-          </button>
         </div>
       </div>
 
@@ -346,7 +358,12 @@ export default function DraftPitch({ formation }: { formation: Formation }) {
           {/* Player panel */}
           <aside className="lg:w-[360px] flex flex-col gap-3 min-h-0" aria-label="Player selection">
             {selectedSlot ? (
-              <PlayerPanel slot={selectedSlot} onConfirm={handleConfirmPick} />
+              <PlayerPanel
+                slot={selectedSlot}
+                filledSlots={filledSlots}
+                showRatingsDuringSelection={showRatingsDuringSelection}
+                onConfirm={handleConfirmPick}
+              />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-4 rounded-xl border border-outline-dim bg-surface-container/30 p-8 text-center min-h-[200px]">
                 <div className="w-14 h-14 rounded-full border-2 border-outline-dim flex items-center justify-center">
@@ -355,10 +372,6 @@ export default function DraftPitch({ formation }: { formation: Formation }) {
                 <p className="text-on-surface-muted font-body text-sm leading-relaxed">
                   Tap a position slot on the pitch to pick a player
                 </p>
-                <Link href="/players"
-                  className="text-gold text-xs font-bold uppercase tracking-widest hover:text-gold-bright transition-colors">
-                  Browse Player Database →
-                </Link>
               </div>
             )}
           </aside>

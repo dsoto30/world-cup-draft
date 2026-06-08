@@ -20,7 +20,7 @@ export default function LandingHero() {
         </p>
 
         <a
-          href="#formation-selection"
+          href="/formations"
           className="mt-9 rounded bg-gold px-10 py-4 font-body text-sm font-bold uppercase tracking-widest text-[#3c2f00] shadow-lg transition-all duration-200 hover:bg-gold-bright focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
           style={{ boxShadow: '0 4px 28px rgba(242,202,80,0.3)' }}
         >

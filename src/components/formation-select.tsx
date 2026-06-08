@@ -9,6 +9,7 @@ import FormationDiagram from './formation-diagram'
 export default function FormationSelect() {
   const router = useRouter()
   const [selected, setSelected] = useState<string>('4-3-3')
+  const [showRatings, setShowRatings] = useState(false)
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-16 gap-12 overflow-hidden">
@@ -69,10 +70,49 @@ export default function FormationSelect() {
         })}
       </div>
 
+      {/* Draft settings */}
+      <div className="relative z-10 flex w-full max-w-4xl flex-col gap-4 rounded-lg border border-outline-dim bg-surface-container/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-body text-sm font-bold uppercase tracking-wider text-on-surface">
+            Show ratings while selecting
+          </p>
+          <p className="mt-1 text-xs text-on-surface-muted">
+            Reveal player ratings during the draft, or keep picks blind until the squad is complete.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showRatings}
+          aria-label="Show ratings while selecting"
+          onClick={() => setShowRatings((current) => !current)}
+          className={[
+            'relative h-7 w-12 shrink-0 overflow-hidden rounded-full border transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold',
+            showRatings ? 'border-gold bg-gold/30' : 'border-outline-dim bg-surface-high',
+          ].join(' ')}
+        >
+          <span
+            className={[
+              'absolute inset-y-0 left-2 flex items-center text-[9px] font-bold uppercase transition-opacity duration-200',
+              showRatings ? 'opacity-100 text-gold' : 'opacity-0',
+            ].join(' ')}
+            aria-hidden
+          >
+            On
+          </span>
+          <span
+            className={[
+              'absolute left-1 top-1 h-5 w-5 rounded-full bg-on-surface shadow transition-transform duration-200',
+              showRatings ? 'translate-x-5' : 'translate-x-0',
+            ].join(' ')}
+          />
+        </button>
+      </div>
+
       {/* CTAs */}
       <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4">
         <button
-          onClick={() => router.push(`/draft?formation=${selected}`)}
+          onClick={() => router.push(`/draft?formation=${selected}&ratings=${showRatings ? 'show' : 'hide'}`)}
           className="px-12 py-4 bg-gold text-[#3c2f00] font-body font-bold text-sm uppercase tracking-widest rounded hover:bg-gold-bright transition-all duration-200 shadow-lg"
           style={{ boxShadow: '0 4px 24px rgba(242,202,80,0.25)' }}
         >

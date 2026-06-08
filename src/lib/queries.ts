@@ -62,31 +62,27 @@ function formatName(family: string, given: string): string {
   return `${given} ${family}`
 }
 
-/**
- * Dynamic base:
- *   62 floor + profile points from tournament apps, career WC count,
- *   confederation strength, and team strength.
- *
- * Performance layer on top:
- *   contextual goals, shootout pressure, finish, wins, defense, upsets, awards
- *   → clamp [62, 99]
- */
 function computeBaseRating({
-  appearances,
+  starterAppearances,
+  substituteAppearances,
   careerTournaments,
   confederationScore,
   teamStrength,
 }: {
-  appearances: number
+  starterAppearances: number
+  substituteAppearances: number
   careerTournaments: number
   confederationScore: number
   teamStrength: number
 }): number {
-  const tournamentPresence = Math.min(appearances, 7) * 1.35
+  // Starters weighted more than subs; cap equivalent to ~7 full starts
+  const weightedApps = starterAppearances * 1.5 + substituteAppearances * 0.5
+  const tournamentPresence = Math.min(weightedApps, 10.5) * 0.9
   const careerPresence = Math.min(Math.max(careerTournaments - 1, 0), 4) * 1.25
 
-  const confederation = confederationScore * 0.65
-  const team = teamStrength * 0.75
+  // Reduced from 0.65/0.75 — historical prestige is a small nudge, not a floor-raiser
+  const confederation = confederationScore * 0.35
+  const team = teamStrength * 0.35
 
   return 62 + tournamentPresence + careerPresence + confederation + team
 }
@@ -98,11 +94,11 @@ function computeRating({
   knockoutPenaltyGoals,
   shootoutConverted,
   shootoutWinConverted,
-  appearances,
+  starterAppearances,
+  substituteAppearances,
   dbPosition,
   teamPosition,
-  groupWins,
-  knockoutWins,
+  totalTeamMatches,
   cleanSheets,
   lowConcessionMatches,
   knockoutCleanSheets,
@@ -119,11 +115,11 @@ function computeRating({
   knockoutPenaltyGoals: number
   shootoutConverted: number
   shootoutWinConverted: number
-  appearances: number
+  starterAppearances: number
+  substituteAppearances: number
   dbPosition: string
   teamPosition: number   // 1=champion, 8=QF, 16=R16, 99=group stage/unknown
-  groupWins: number
-  knockoutWins: number
+  totalTeamMatches: number
   cleanSheets: number
   lowConcessionMatches: number
   knockoutCleanSheets: number
@@ -135,7 +131,8 @@ function computeRating({
   awardsCount: number
 }): number {
   let r = computeBaseRating({
-    appearances,
+    starterAppearances,
+    substituteAppearances,
     careerTournaments,
     confederationScore,
     teamStrength,
@@ -149,14 +146,17 @@ function computeRating({
     knockoutPenaltyGoals * 0.75
   r += Math.min(goalPressure, 21)
 
-  if (teamPosition === 1)       r += 12
-  else if (teamPosition === 2)  r += 8
-  else if (teamPosition <= 4)   r += 5
-  else if (teamPosition <= 8)   r += 3   // quarter-finals
-  else if (teamPosition <= 16)  r += 1   // round of 16
+  // Scale team finish bonus by how much this player actually participated.
+  // A bench warmer on a champion team gets a fraction of the bonus vs. a starter who played every game.
+  const appearances = starterAppearances + substituteAppearances
+  const participationRatio = totalTeamMatches > 0 ? Math.min(1, appearances / totalTeamMatches) : 0
+  const participationScale = Math.min(1.0, 0.4 + participationRatio * 0.6)
 
-  r += groupWins * 0.35
-  r += knockoutWins
+  if (teamPosition === 1)       r += 9 * participationScale
+  else if (teamPosition === 2)  r += 6 * participationScale
+  else if (teamPosition <= 4)   r += 4 * participationScale
+  else if (teamPosition <= 8)   r += 2 * participationScale
+  else if (teamPosition <= 16)  r += 0.5 * participationScale
 
   const shootoutPressure = shootoutConverted * 0.75 + shootoutWinConverted * 1.25
   r += Math.min(shootoutPressure, 3)
@@ -263,10 +263,19 @@ const RATING_CTES = `
     GROUP BY g.player_id, g.tournament_id
   ),
   agg_apps AS (
-    SELECT pa.player_id, pa.tournament_id, COUNT(*) AS appearances
+    SELECT pa.player_id, pa.tournament_id,
+      COUNT(*) AS appearances,
+      SUM(CASE WHEN pa.starter = 1 THEN 1 ELSE 0 END) AS starter_appearances,
+      SUM(CASE WHEN pa.substitute = 1 THEN 1 ELSE 0 END) AS substitute_appearances
     FROM player_appearances pa
     JOIN mens_wc mwc ON mwc.tournament_id = pa.tournament_id
     GROUP BY pa.player_id, pa.tournament_id
+  ),
+  team_matches AS (
+    SELECT ta.team_id, ta.tournament_id, COUNT(*) AS total_matches
+    FROM team_appearances ta
+    JOIN mens_wc mwc ON mwc.tournament_id = ta.tournament_id
+    GROUP BY ta.team_id, ta.tournament_id
   ),
   defense_stats AS (
     SELECT pa.player_id, pa.tournament_id, pa.team_id,
@@ -309,15 +318,6 @@ const RATING_CTES = `
     JOIN mens_wc mwc ON mwc.tournament_id = aw.tournament_id
     WHERE aw.award_id IN ${RATING_AWARD_IDS}
     GROUP BY aw.player_id, aw.tournament_id
-  ),
-  team_wins AS (
-    SELECT ta.team_id, ta.tournament_id,
-      SUM(CASE WHEN m.group_stage = 1 AND ta.win = 1 THEN 1 ELSE 0 END) AS group_wins,
-      SUM(CASE WHEN m.knockout_stage = 1 AND ta.win = 1 THEN 1 ELSE 0 END) AS knockout_wins
-    FROM team_appearances ta
-    JOIN matches m ON m.match_id = ta.match_id
-    JOIN mens_wc mwc ON mwc.tournament_id = ta.tournament_id
-    GROUP BY ta.team_id, ta.tournament_id
   ),
   player_upsets AS (
     SELECT pa.player_id, pa.tournament_id, pa.team_id,
@@ -403,9 +403,10 @@ interface RawRatingRow {
   shootout_converted: number
   shootout_win_converted: number
   appearances: number
+  starter_appearances: number
+  substitute_appearances: number
   team_position: number
-  group_wins: number
-  knockout_wins: number
+  total_team_matches: number
   clean_sheets: number
   low_concession_matches: number
   knockout_clean_sheets: number
@@ -447,9 +448,10 @@ function ratingSelect(): string {
       COALESCE(ss.shootout_converted, 0) AS shootout_converted,
       COALESCE(ss.shootout_win_converted, 0) AS shootout_win_converted,
       COALESCE(aa.appearances, 0) AS appearances,
+      COALESCE(aa.starter_appearances, 0) AS starter_appearances,
+      COALESCE(aa.substitute_appearances, 0) AS substitute_appearances,
       ${TEAM_POSITION_EXPR} AS team_position,
-      COALESCE(tw.group_wins, 0) AS group_wins,
-      COALESCE(tw.knockout_wins, 0) AS knockout_wins,
+      COALESCE(tm.total_matches, 0) AS total_team_matches,
       COALESCE(ds.clean_sheets, 0) AS clean_sheets,
       COALESCE(ds.low_concession_matches, 0) AS low_concession_matches,
       COALESCE(ds.knockout_clean_sheets, 0) AS knockout_clean_sheets,
@@ -479,7 +481,7 @@ function ratingSelect(): string {
       ON ts_pos.tournament_id = s.tournament_id AND ts_pos.team_id = s.team_id
     LEFT JOIN qualified_teams qt
       ON qt.tournament_id = s.tournament_id AND qt.team_id = s.team_id
-    LEFT JOIN team_wins tw ON tw.team_id = s.team_id AND tw.tournament_id = s.tournament_id
+    LEFT JOIN team_matches tm ON tm.team_id = s.team_id AND tm.tournament_id = s.tournament_id
     LEFT JOIN player_upsets pu
       ON pu.player_id = s.player_id
      AND pu.tournament_id = s.tournament_id
@@ -503,11 +505,11 @@ function toWCPlayer(r: RawRatingRow): WCPlayer {
     knockoutPenaltyGoals: r.knockout_penalty_goals,
     shootoutConverted: r.shootout_converted,
     shootoutWinConverted: r.shootout_win_converted,
-    appearances: r.appearances,
+    starterAppearances: r.starter_appearances,
+    substituteAppearances: r.substitute_appearances,
     dbPosition: r.position_code,
     teamPosition: r.team_position,
-    groupWins: r.group_wins,
-    knockoutWins: r.knockout_wins,
+    totalTeamMatches: r.total_team_matches,
     cleanSheets: r.clean_sheets,
     lowConcessionMatches: r.low_concession_matches,
     knockoutCleanSheets: r.knockout_clean_sheets,

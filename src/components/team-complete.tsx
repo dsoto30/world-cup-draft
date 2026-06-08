@@ -201,10 +201,10 @@ export default function TeamComplete({ formation, filledSlots, slots }: Props) {
             Tweet Squad
           </button>
           <Link
-            href="/"
+            href="/formations"
             className="w-full py-3 rounded font-body font-bold text-xs uppercase tracking-widest text-center border border-outline-dim/50 text-on-surface-muted/60 hover:text-on-surface-muted transition-colors"
           >
-            New Formation
+            Try Again
           </Link>
         </div>
       </aside>
