@@ -42,6 +42,7 @@ next-env.d.ts
 
 # database (binary, download from jfjelstul/worldcup)
 *.db
+!src/db/worldcup.db
 
 
 .claude/
