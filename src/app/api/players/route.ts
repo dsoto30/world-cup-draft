@@ -12,10 +12,12 @@ export async function GET(req: NextRequest) {
 
   const dbPosition = APP_TO_DB[position] ?? 'FW'
 
+  const exclude = (searchParams.get('exclude') ?? '').split(',').filter(Boolean)
+
   try {
     if (mode === 'randomLegends' || mode === 'randomTeam') {
-      const result = await getRandomLegendPlayersForDraft(dbPosition)
-      return NextResponse.json(result)
+      const result = await getRandomLegendPlayersForDraft(dbPosition, exclude)
+      return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
     }
 
     const result = await searchPlayersForDraft({ dbPosition, search, page, pageSize })

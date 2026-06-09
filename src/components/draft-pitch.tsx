@@ -10,6 +10,7 @@ import {
   POSITION_COLOR,
 } from '@/lib/formations'
 import type { WCPlayer } from '@/lib/queries'
+import FlagMark from './flag-mark'
 import TeamComplete from './team-complete'
 
 function PitchSVG() {
@@ -124,63 +125,6 @@ const AWARD_ICON: Record<string, string> = {
   'Best Young Player': '🌟',
 }
 
-const TEAM_FLAG: Record<string, string> = {
-  ALG: '🇩🇿', AGO: '🇦🇴', ARE: '🇦🇪', ARG: '🇦🇷', AUS: '🇦🇺', AUT: '🇦🇹',
-  BEL: '🇧🇪', BIH: '🇧🇦', BOL: '🇧🇴', BRA: '🇧🇷', BGR: '🇧🇬', BUL: '🇧🇬',
-  CAN: '🇨🇦', CHE: '🇨🇭', CHI: '🇨🇱', CHL: '🇨🇱', CHN: '🇨🇳', CIV: '🇨🇮',
-  CMR: '🇨🇲', COD: '🇨🇩', COL: '🇨🇴', CRC: '🇨🇷', CRI: '🇨🇷', CRO: '🇭🇷',
-  CSK: '🇨🇿',
-  CUB: '🇨🇺', CZE: '🇨🇿', DDR: '🇩🇪', DEN: '🇩🇰', DEU: '🇩🇪', DNK: '🇩🇰',
-  DZA: '🇩🇿', ECU: '🇪🇨', EGY: '🇪🇬', ENG: '🏴', ESP: '🇪🇸', FRA: '🇫🇷',
-  FRG: '🇩🇪', GER: '🇩🇪', GHA: '🇬🇭', GRC: '🇬🇷', GRE: '🇬🇷', HND: '🇭🇳',
-  HON: '🇭🇳', HRV: '🇭🇷', HTI: '🇭🇹', HUN: '🇭🇺', IDN: '🇮🇩', IRL: '🇮🇪',
-  IRN: '🇮🇷', IRQ: '🇮🇶', ISL: '🇮🇸', ISR: '🇮🇱', ITA: '🇮🇹', JAM: '🇯🇲',
-  JPN: '🇯🇵', KOR: '🇰🇷', KSA: '🇸🇦', KUW: '🇰🇼', KWT: '🇰🇼', MAR: '🇲🇦',
-  MEX: '🇲🇽', NED: '🇳🇱', NGA: '🇳🇬', NLD: '🇳🇱',
-  NIR: '🇬🇧', NOR: '🇳🇴', NZL: '🇳🇿', PAN: '🇵🇦', PAR: '🇵🇾', PER: '🇵🇪',
-  POL: '🇵🇱', POR: '🇵🇹', PRK: '🇰🇵', PRT: '🇵🇹', PRY: '🇵🇾', QAT: '🇶🇦',
-  ROU: '🇷🇴', RSA: '🇿🇦', RUS: '🇷🇺', SAU: '🇸🇦', SCG: '🇷🇸', SCO: '🏴',
-  SEN: '🇸🇳', SLV: '🇸🇻', SRB: '🇷🇸', SUI: '🇨🇭', SUN: '🇷🇺', SVK: '🇸🇰',
-  SVN: '🇸🇮', SWE: '🇸🇪', TCH: '🇨🇿', TGO: '🇹🇬', TOG: '🇹🇬', TRI: '🇹🇹',
-  TTO: '🇹🇹', TUN: '🇹🇳', TUR: '🇹🇷', UAE: '🇦🇪', UKR: '🇺🇦', URS: '🇷🇺',
-  URU: '🇺🇾', URY: '🇺🇾', USA: '🇺🇸', WAL: '🏴', YUG: '🇷🇸', ZAF: '🇿🇦',
-}
-
-const TEAM_FLAG_IMAGE: Record<string, string> = {
-  ENG: '/flags/gb-eng.svg',
-  WAL: '/flags/gb-wls.svg',
-}
-
-function getFlag(teamCode: string, teamName: string): string {
-  const normalizedName = teamName.toLowerCase()
-  if (normalizedName.includes('west germany') || normalizedName.includes('germany')) return '🇩🇪'
-  if (normalizedName.includes('netherlands')) return '🇳🇱'
-  if (normalizedName.includes('uruguay')) return '🇺🇾'
-  return TEAM_FLAG[teamCode.toUpperCase()] ?? '🏳'
-}
-
-function getFlagImage(teamCode: string, teamName: string): string | undefined {
-  const normalizedName = teamName.toLowerCase()
-  if (normalizedName.includes('england')) return TEAM_FLAG_IMAGE.ENG
-  if (normalizedName.includes('wales')) return TEAM_FLAG_IMAGE.WAL
-  return TEAM_FLAG_IMAGE[teamCode.toUpperCase()]
-}
-
-function FlagMark({ teamCode, teamName }: { teamCode: string; teamName: string }) {
-  const imageSrc = getFlagImage(teamCode, teamName)
-  if (imageSrc) {
-    return (
-      <span
-        aria-label={`${teamName} flag`}
-        role="img"
-        className="h-4 w-6 rounded-[2px] bg-cover bg-center"
-        style={{ backgroundImage: `url(${imageSrc})` }}
-      />
-    )
-  }
-
-  return <span className="text-lg leading-none">{getFlag(teamCode, teamName)}</span>
-}
 
 function getRatingTier(rating: number): {
   label: string
@@ -213,12 +157,13 @@ function PlayerPanel({ slot, filledSlots, onConfirm }: PlayerPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const fetchDraftPlayers = useCallback(
-    async (pos: string) => {
+    async (pos: string, exclude: string[]) => {
       setLoading(true)
       setSelectedId(null)
       setLoadError(null)
       try {
-        const res = await fetch(`/api/players?mode=randomLegends&position=${pos}`)
+        const excludeParam = exclude.length > 0 ? `&exclude=${encodeURIComponent(exclude.join(','))}` : ''
+        const res = await fetch(`/api/players?mode=randomLegends&position=${pos}${excludeParam}`, { cache: 'no-store' })
         const data = (await res.json()) as DraftPlayersResponse
         if (!res.ok) {
           setPlayers([])
@@ -238,11 +183,16 @@ function PlayerPanel({ slot, filledSlots, onConfirm }: PlayerPanelProps) {
   )
 
   useEffect(() => {
+    const exclude = Object.entries(filledSlots)
+      .filter(([id]) => id !== slot.id)
+      .map(([, p]) => p.playerId)
     const timer = window.setTimeout(() => {
-      fetchDraftPlayers(slot.position)
+      fetchDraftPlayers(slot.position, exclude)
     }, 0)
 
     return () => window.clearTimeout(timer)
+    // filledSlots is intentionally read as a snapshot when the slot opens, not tracked as a dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot.id, slot.position, fetchDraftPlayers])
 
   const pickedPlayerIds = new Set(
@@ -250,7 +200,8 @@ function PlayerPanel({ slot, filledSlots, onConfirm }: PlayerPanelProps) {
       .filter(([slotId]) => slotId !== slot.id)
       .map(([, player]) => player.playerId),
   )
-  const selectedPlayer = players.find((p) => p.playerId === selectedId && !pickedPlayerIds.has(p.playerId))
+  const availablePlayers = players.filter((p) => !pickedPlayerIds.has(p.playerId))
+  const selectedPlayer = availablePlayers.find((p) => p.playerId === selectedId)
   const color = POSITION_COLOR[slot.position]
 
   return (
@@ -274,26 +225,19 @@ function PlayerPanel({ slot, filledSlots, onConfirm }: PlayerPanelProps) {
           <p className="text-center text-on-surface-muted text-sm py-8">No players found</p>
         ) : (
           <div className="flex flex-col gap-1" role="listbox" aria-label="Available players">
-            {players.map((player) => {
+            {availablePlayers.map((player) => {
               const isChosen = selectedId === player.playerId
-              const isAlreadyPicked = pickedPlayerIds.has(player.playerId)
               const tier = getRatingTier(player.rating)
               return (
                 <button
                   key={player.playerId}
                   role="option"
                   aria-selected={isChosen}
-                  aria-disabled={isAlreadyPicked}
-                  disabled={isAlreadyPicked}
                   onClick={() => setSelectedId(player.playerId)}
                   className={[
                     'grid grid-cols-[2rem_2.5rem_minmax(0,1fr)_3.25rem_auto] items-center gap-2 px-3 py-2.5 rounded-lg border transition-all duration-150 cursor-pointer text-left',
                     tier.className,
-                    isAlreadyPicked
-                      ? 'opacity-45 cursor-not-allowed'
-                      : isChosen
-                      ? 'border-gold'
-                      : 'hover:border-gold/50',
+                    isChosen ? 'border-gold' : 'hover:border-gold/50',
                   ].join(' ')}
                   style={isChosen ? { ...tier.style, boxShadow: '0 0 0 1px #f2ca50' } : tier.style}
                 >
@@ -319,11 +263,6 @@ function PlayerPanel({ slot, filledSlots, onConfirm }: PlayerPanelProps) {
                       </span>
                     ))}
                   </span>
-                  {isAlreadyPicked && (
-                    <span className="col-span-5 text-[10px] font-bold uppercase tracking-wider text-on-surface-muted">
-                      Picked
-                    </span>
-                  )}
                 </button>
               )
             })}

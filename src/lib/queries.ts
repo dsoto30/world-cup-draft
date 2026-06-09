@@ -280,11 +280,19 @@ export async function searchPlayersForDraft(opts: SearchOpts): Promise<{
 
 // ─── Random legends for draft (rating ≥ 82, best card per player) ─────────────
 
-export async function getRandomLegendPlayersForDraft(dbPosition: string): Promise<{
+export async function getRandomLegendPlayersForDraft(
+  dbPosition: string,
+  excludePlayerIds: string[] = []
+): Promise<{
   players: WCPlayer[]
   total: number
   context: null
 }> {
+  const excludeClause =
+    excludePlayerIds.length > 0
+      ? `AND pr.player_id NOT IN (${excludePlayerIds.map(() => '?').join(',')})`
+      : ''
+
   const sql = `
     WITH
     ranked AS (
@@ -294,7 +302,7 @@ export async function getRandomLegendPlayersForDraft(dbPosition: string): Promis
       FROM player_ratings pr
       JOIN squads s ON s.player_id = pr.player_id AND s.tournament_id = pr.tournament_id
       JOIN players p ON p.player_id = pr.player_id
-      WHERE s.position_code = @dbPosition AND p.female = 0
+      WHERE s.position_code = ? AND p.female = 0 ${excludeClause}
     ),
     eligible AS (
       SELECT player_id, tournament_id, rating,
@@ -309,7 +317,7 @@ export async function getRandomLegendPlayersForDraft(dbPosition: string): Promis
     LIMIT 4
   `
 
-  const result = await getDb().execute({ sql, args: { dbPosition } })
+  const result = await getDb().execute({ sql, args: [dbPosition, ...excludePlayerIds] })
   const rows = toPlain<RawRow & { total_count: number }>(result)
   const total = rows[0]?.total_count ?? 0
 
@@ -317,3 +325,28 @@ export async function getRandomLegendPlayersForDraft(dbPosition: string): Promis
 }
 
 export const getRandomTeamPlayersForDraft = getRandomLegendPlayersForDraft
+
+// ─── Fetch specific player cards by (playerId, tournamentId) pairs ─────────────
+
+export async function getPlayersByIds(
+  pairs: { playerId: string; tournamentId: string }[]
+): Promise<WCPlayer[]> {
+  if (pairs.length === 0) return []
+
+  const conditions = pairs
+    .map(() => `(pr.player_id = ? AND pr.tournament_id = ?)`)
+    .join(' OR ')
+
+  const args = pairs.flatMap((p) => [p.playerId, p.tournamentId])
+
+  const sql = `
+    WITH ${DISPLAY_CTES}
+    SELECT ${displayCols('pr')}
+    FROM player_ratings pr
+    ${displayJoins('pr')}
+    WHERE p.female = 0 AND (${conditions})
+  `
+
+  const result = await getDb().execute({ sql, args })
+  return toPlain<RawRow>(result).map(toWCPlayer)
+}

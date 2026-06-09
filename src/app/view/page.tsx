@@ -1,23 +1,43 @@
 import { redirect } from 'next/navigation'
+import { unstable_cache } from 'next/cache'
 import { getFormation, buildSlots } from '@/lib/formations'
-import type { Position } from '@/lib/formations'
+import { getPlayersByIds } from '@/lib/queries'
+import type { WCPlayer } from '@/lib/queries'
 import TeamView from '@/components/team-view'
 
-interface TeamPayload {
-  f: string
-  r: number[]
+// ─── Payload types ────────────────────────────────────────────────────────────
+
+interface PlayerSnapshot {
+  r: number   // rating
+  n: string   // fullName
+  tc: string  // teamCode
+  tn: string  // teamName
+  ty: number  // tournamentYear
 }
 
-function decodePayload(raw: string): TeamPayload | null {
+interface PayloadV2 {
+  v: 2
+  f: string
+  p: PlayerSnapshot[]
+}
+
+interface PayloadV1 {
+  f: string
+  p: [string, string][]
+}
+
+function decodePayload(raw: string): PayloadV1 | PayloadV2 | null {
   try {
     const json = Buffer.from(raw, 'base64').toString('utf-8')
     const data = JSON.parse(json)
-    if (typeof data.f !== 'string' || !Array.isArray(data.r)) return null
-    return data as TeamPayload
+    if (typeof data.f !== 'string' || !Array.isArray(data.p)) return null
+    return data as PayloadV1 | PayloadV2
   } catch {
     return null
   }
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function ViewPage({
   searchParams,
@@ -34,25 +54,63 @@ export default async function ViewPage({
   if (!formation) redirect('/')
 
   const slots = buildSlots(formation)
-  if (payload.r.length !== slots.length) redirect('/')
+  if (payload.p.length !== slots.length) redirect('/')
 
-  const players = Object.fromEntries(
-    slots.map((slot, i) => [
-      slot.id,
-      { rating: payload.r[i], position: slot.position as Position },
-    ])
-  )
+  let filledSlots: Record<string, WCPlayer>
 
-  const overall = Math.round(
-    payload.r.reduce((a, b) => a + b, 0) / payload.r.length
-  )
+  if ('v' in payload && payload.v === 2) {
+    // v2: all display data is in the URL — no DB call needed
+    filledSlots = {}
+    slots.forEach((slot, i) => {
+      const snap = (payload as PayloadV2).p[i]
+      if (!snap) return
+      filledSlots[slot.id] = {
+        playerId: '',
+        familyName: '',
+        givenName: '',
+        fullName: snap.n,
+        position: slot.position,
+        dbPositionCode: '',
+        teamName: snap.tn,
+        teamCode: snap.tc,
+        tournamentId: undefined,
+        tournamentYear: snap.ty || undefined,
+        shirtNumber: undefined,
+        careerTournaments: 0,
+        wonTournament: false,
+        awardsCount: 0,
+        awards: [],
+        rating: snap.r,
+      }
+    })
+  } else {
+    // v1 legacy: look up players by ID from DB (cached 24h per unique squad)
+    const pairs = (payload as PayloadV1).p.map(([playerId, tournamentId]) => ({ playerId, tournamentId }))
+    const cacheKey = (payload as PayloadV1).p.map(([pid, tid]) => `${pid}|${tid}`).join(',')
+    const fetchSquad = unstable_cache(
+      () => getPlayersByIds(pairs),
+      [`squad-${cacheKey}`],
+      { revalidate: 86400 }
+    )
+    const fetched = await fetchSquad()
+    const byKey = new Map(fetched.map((p) => [`${p.playerId}|${p.tournamentId}`, p]))
+    filledSlots = {}
+    slots.forEach((slot, i) => {
+      const [pid, tid] = (payload as PayloadV1).p[i]
+      const player = byKey.get(`${pid}|${tid}`)
+      if (player) filledSlots[slot.id] = player
+    })
+  }
+
+  const ratings = slots.map((s) => filledSlots[s.id]?.rating ?? 0)
+  const overall = Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
 
   return (
     <main className="bg-surface min-h-screen">
       <TeamView
         formation={formation}
         slots={slots}
-        players={players}
+        filledSlots={filledSlots}
         overall={overall}
       />
     </main>

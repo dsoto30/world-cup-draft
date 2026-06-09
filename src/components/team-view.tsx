@@ -1,12 +1,9 @@
 import Link from 'next/link'
 import { type Formation, type PositionSlot, type Position, POSITION_COLOR } from '@/lib/formations'
+import type { WCPlayer } from '@/lib/queries'
+import FlagMark from './flag-mark'
 
 const POSITION_ORDER: Position[] = ['FWD', 'MD', 'DF', 'GK']
-
-interface SlimPlayer {
-  rating: number
-  position: Position
-}
 
 function PitchSVG() {
   const s = 'rgba(255,255,255,0.18)'
@@ -46,22 +43,22 @@ function PitchSVG() {
 interface Props {
   formation: Formation
   slots: PositionSlot[]
-  players: Record<string, SlimPlayer>
+  filledSlots: Record<string, WCPlayer>
   overall: number
 }
 
-export default function TeamView({ formation, slots, players, overall }: Props) {
-  const grouped = POSITION_ORDER.reduce<Record<Position, number[]>>(
+export default function TeamView({ formation, slots, filledSlots, overall }: Props) {
+  const grouped = POSITION_ORDER.reduce<Record<Position, WCPlayer[]>>(
     (acc, pos) => ({ ...acc, [pos]: [] }),
     { GK: [], DF: [], MD: [], FWD: [] }
   )
   slots.forEach((s) => {
-    const r = players[s.id]?.rating
-    if (r != null) grouped[s.position].push(r)
+    const p = filledSlots[s.id]
+    if (p) grouped[s.position].push(p)
   })
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 py-12 gap-8">
+    <div className="min-h-screen flex flex-col items-center px-4 py-12 gap-8 bg-surface">
       {/* Header */}
       <header className="text-center space-y-2">
         <p className="text-on-surface-muted font-body text-xs uppercase tracking-widest">
@@ -72,41 +69,16 @@ export default function TeamView({ formation, slots, players, overall }: Props) 
         </h1>
       </header>
 
-      {/* Overall badge */}
-      <div
-        className="flex items-center gap-4 px-6 py-4 rounded-2xl border border-gold/30 bg-surface-container"
-        style={{ boxShadow: '0 0 24px 2px rgba(242,202,80,0.1)' }}
-      >
-        <div className="text-center">
-          <div
-            className="font-display font-extrabold leading-none"
-            style={{ fontSize: '3.5rem', color: '#f2ca50' }}
-          >
-            {overall}
-          </div>
-          <div className="text-on-surface-muted font-body text-[10px] uppercase tracking-widest">
-            OVR
-          </div>
-        </div>
-        <div className="border-l border-outline-dim pl-4">
-          <div className="text-on-surface-muted font-body text-xs uppercase tracking-widest mb-1">
-            Formation
-          </div>
-          <div className="font-display text-2xl font-bold text-on-surface">{formation.label}</div>
-        </div>
-      </div>
-
-      {/* Pitch + roster */}
-      <div className="flex flex-col lg:flex-row gap-8 w-full max-w-3xl">
+      <div className="flex flex-col lg:flex-row gap-6 w-full max-w-3xl">
         {/* Pitch */}
         <div className="flex-1 flex justify-center">
           <div
             className="relative w-full rounded-xl overflow-hidden shadow-2xl"
-            style={{ maxWidth: '340px', aspectRatio: '2/3' }}
+            style={{ maxWidth: '360px', aspectRatio: '2/3' }}
           >
             <PitchSVG />
             {slots.map((slot) => {
-              const player = players[slot.id]
+              const player = filledSlots[slot.id]
               const color = POSITION_COLOR[slot.position]
               return (
                 <div
@@ -131,38 +103,66 @@ export default function TeamView({ formation, slots, players, overall }: Props) 
           </div>
         </div>
 
-        {/* Roster + CTA */}
-        <div className="flex flex-col gap-4 lg:w-64">
-          <div className="rounded-xl border border-outline-dim bg-surface-container p-4 space-y-3">
-            <h2 className="font-display text-sm font-bold text-on-surface uppercase tracking-wider">
-              Lineup
-            </h2>
-            {POSITION_ORDER.filter((pos) => grouped[pos].length > 0).map((pos) => (
-              <div key={pos} className="flex items-center gap-3">
-                <span
-                  className="w-9 text-center text-xs font-bold uppercase py-0.5 rounded border shrink-0"
-                  style={{
-                    color: POSITION_COLOR[pos],
-                    borderColor: `${POSITION_COLOR[pos]}44`,
-                    backgroundColor: `${POSITION_COLOR[pos]}11`,
-                  }}
-                >
-                  {pos}
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {grouped[pos].map((rating, i) => (
-                    <span key={i} className="text-gold font-display font-bold text-sm">
-                      {rating}
-                      {i < grouped[pos].length - 1 && (
-                        <span className="text-outline-dim mx-1">·</span>
-                      )}
-                    </span>
-                  ))}
-                </div>
+        {/* Stats + roster */}
+        <aside className="lg:w-[360px] flex flex-col gap-5">
+          {/* Overall + formation */}
+          <div className="flex items-center gap-5 p-5 rounded-xl border border-gold/30 bg-surface-container">
+            <div className="text-center">
+              <div
+                className="font-display font-extrabold leading-none"
+                style={{ fontSize: '4rem', color: '#f2ca50' }}
+              >
+                {overall}
               </div>
-            ))}
+              <div className="text-on-surface-muted font-body text-xs uppercase tracking-widest mt-1">
+                Overall
+              </div>
+            </div>
+            <div className="flex-1 border-l border-outline-dim pl-5">
+              <div className="text-on-surface-muted font-body text-xs uppercase tracking-widest mb-1">
+                Formation
+              </div>
+              <div className="font-display text-2xl font-bold text-on-surface">{formation.label}</div>
+            </div>
           </div>
 
+          {/* Player roster */}
+          <div className="rounded-xl border border-outline-dim bg-surface-container overflow-hidden">
+            {POSITION_ORDER.filter((pos) => grouped[pos].length > 0).flatMap((pos) =>
+              grouped[pos].map((player, i) => (
+                <div
+                  key={`${pos}-${i}`}
+                  className="flex items-center gap-3 px-4 py-2.5"
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                >
+                  <span className="font-display font-bold text-gold text-sm w-7 text-right shrink-0">
+                    {player.rating}
+                  </span>
+                  <span
+                    className="text-[10px] font-bold uppercase w-8 text-center shrink-0"
+                    style={{ color: POSITION_COLOR[pos] }}
+                  >
+                    {pos}
+                  </span>
+                  <span className="font-body text-on-surface text-sm flex-1 truncate">
+                    {player.fullName}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <FlagMark teamCode={player.teamCode} teamName={player.teamName} />
+                    <span className="text-on-surface-muted text-[9px] font-bold">{player.teamCode}</span>
+                    {player.tournamentYear && (
+                      <>
+                        <span className="text-outline-dim text-[9px]">·</span>
+                        <span className="text-on-surface-muted text-[9px]">{player.tournamentYear}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* CTA */}
           <Link
             href="/"
             className="w-full py-3 rounded font-body font-bold text-sm uppercase tracking-widest text-center bg-gold text-[#3c2f00] hover:bg-gold-bright transition-colors"
@@ -170,7 +170,7 @@ export default function TeamView({ formation, slots, players, overall }: Props) 
           >
             Build Your Own Squad →
           </Link>
-        </div>
+        </aside>
       </div>
     </div>
   )
