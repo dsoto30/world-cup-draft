@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { type Formation, type PositionSlot, type Position, POSITION_COLOR } from '@/lib/formations'
 import type { WCPlayer } from '@/lib/queries'
+import FlagMark from './flag-mark'
 
 const POSITION_ORDER: Position[] = ['FWD', 'MD', 'DF', 'GK']
 
@@ -64,8 +65,17 @@ export default function TeamComplete({ formation, filledSlots, slots }: Props) {
   })
 
   function getShareUrl() {
-    const payload = { f: formation.id, r: ratings }
-    const encoded = encodeURIComponent(btoa(JSON.stringify(payload)))
+    const players = slots.map((s) => {
+      const p = filledSlots[s.id]
+      return { r: p?.rating ?? 0, n: p?.fullName ?? '', tc: p?.teamCode ?? '', tn: p?.teamName ?? '', ty: p?.tournamentYear ?? 0 }
+    })
+    const payload = { v: 2, f: formation.id, p: players }
+    // btoa only handles Latin-1; TextEncoder → UTF-8 bytes → base64 is safe for
+    // any player name (Slavic, Turkish, etc.)
+    const bytes = new TextEncoder().encode(JSON.stringify(payload))
+    let binary = ''
+    bytes.forEach((b) => { binary += String.fromCharCode(b) })
+    const encoded = encodeURIComponent(btoa(binary))
     return `${window.location.origin}/view?d=${encoded}`
   }
 
@@ -180,6 +190,16 @@ export default function TeamComplete({ formation, filledSlots, slots }: Props) {
                 <span className="font-body text-on-surface text-sm flex-1 truncate">
                   {player.fullName}
                 </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <FlagMark teamCode={player.teamCode} teamName={player.teamName} />
+                  <span className="text-on-surface-muted text-[9px] font-bold">{player.teamCode}</span>
+                  {player.tournamentYear && (
+                    <>
+                      <span className="text-outline-dim text-[9px]">·</span>
+                      <span className="text-on-surface-muted text-[9px]">{player.tournamentYear}</span>
+                    </>
+                  )}
+                </div>
               </div>
             ))
           )}
