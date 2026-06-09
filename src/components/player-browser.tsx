@@ -75,7 +75,6 @@ export default function PlayerBrowser({
             onChange={(e) => push({ team: e.target.value })}
             className="bg-surface-container border border-outline-dim text-on-surface text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-gold/60 cursor-pointer"
           >
-            <option value="">All Teams</option>
             {teams.map((t) => (
               <option key={t.team_id} value={t.team_id}>
                 {t.team_name} ({t.team_code})

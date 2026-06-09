@@ -86,24 +86,6 @@ export default function PlayerBrowseCard({ player }: { player: WCPlayer }) {
       </div>
 
       {/* Stats row */}
-      <div
-        className="mt-auto mx-3 mb-3 rounded-lg px-3 py-2 grid grid-cols-3 gap-1 text-center"
-        style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
-      >
-        <div>
-          <div className="text-on-surface font-bold text-sm leading-none">{player.goals}</div>
-          <div className="text-on-surface-muted text-[9px] uppercase mt-0.5">Goals</div>
-        </div>
-        <div>
-          <div className="text-on-surface font-bold text-sm leading-none">{player.appearances}</div>
-          <div className="text-on-surface-muted text-[9px] uppercase mt-0.5">Apps</div>
-        </div>
-        <div>
-          <div className="text-on-surface font-bold text-sm leading-none">{player.careerTournaments}</div>
-          <div className="text-on-surface-muted text-[9px] uppercase mt-0.5">WCs</div>
-        </div>
-      </div>
-
       {/* Footer: nation + year */}
       <div
         className="flex items-center justify-between px-4 py-2"
