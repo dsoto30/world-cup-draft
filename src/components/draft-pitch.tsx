@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import {
   type Formation,
@@ -104,41 +105,131 @@ function PlayerLoading() {
 interface PlayerPanelProps {
   slot: PositionSlot
   filledSlots: Record<string, WCPlayer>
-  showRatingsDuringSelection: boolean
   onConfirm: (player: WCPlayer) => void
 }
 
-interface RandomTeamContext {
-  tournamentId: string
-  tournamentYear: number
-  teamId: string
-  teamName: string
-  teamCode: string
-}
-
-interface RandomTeamResponse {
+interface DraftPlayersResponse {
   players: WCPlayer[]
-  total: number
-  context: RandomTeamContext | null
+  error?: string
 }
 
-function PlayerPanel({ slot, filledSlots, showRatingsDuringSelection, onConfirm }: PlayerPanelProps) {
+const AWARD_ICON: Record<string, string> = {
+  'Golden Ball': '⭐',
+  'Silver Ball': '🥈',
+  'Bronze Ball': '🥉',
+  'Golden Boot': '👟',
+  'Silver Boot': '🥈',
+  'Bronze Boot': '🥉',
+  'Golden Glove': '🧤',
+  'Best Young Player': '🌟',
+}
+
+const TEAM_FLAG: Record<string, string> = {
+  ALG: '🇩🇿', AGO: '🇦🇴', ARE: '🇦🇪', ARG: '🇦🇷', AUS: '🇦🇺', AUT: '🇦🇹',
+  BEL: '🇧🇪', BIH: '🇧🇦', BOL: '🇧🇴', BRA: '🇧🇷', BGR: '🇧🇬', BUL: '🇧🇬',
+  CAN: '🇨🇦', CHE: '🇨🇭', CHI: '🇨🇱', CHL: '🇨🇱', CHN: '🇨🇳', CIV: '🇨🇮',
+  CMR: '🇨🇲', COD: '🇨🇩', COL: '🇨🇴', CRC: '🇨🇷', CRI: '🇨🇷', CRO: '🇭🇷',
+  CSK: '🇨🇿',
+  CUB: '🇨🇺', CZE: '🇨🇿', DDR: '🇩🇪', DEN: '🇩🇰', DEU: '🇩🇪', DNK: '🇩🇰',
+  DZA: '🇩🇿', ECU: '🇪🇨', EGY: '🇪🇬', ENG: '🏴', ESP: '🇪🇸', FRA: '🇫🇷',
+  FRG: '🇩🇪', GER: '🇩🇪', GHA: '🇬🇭', GRC: '🇬🇷', GRE: '🇬🇷', HND: '🇭🇳',
+  HON: '🇭🇳', HRV: '🇭🇷', HTI: '🇭🇹', HUN: '🇭🇺', IDN: '🇮🇩', IRL: '🇮🇪',
+  IRN: '🇮🇷', IRQ: '🇮🇶', ISL: '🇮🇸', ISR: '🇮🇱', ITA: '🇮🇹', JAM: '🇯🇲',
+  JPN: '🇯🇵', KOR: '🇰🇷', KSA: '🇸🇦', KUW: '🇰🇼', KWT: '🇰🇼', MAR: '🇲🇦',
+  MEX: '🇲🇽', NED: '🇳🇱', NGA: '🇳🇬', NLD: '🇳🇱',
+  NIR: '🇬🇧', NOR: '🇳🇴', NZL: '🇳🇿', PAN: '🇵🇦', PAR: '🇵🇾', PER: '🇵🇪',
+  POL: '🇵🇱', POR: '🇵🇹', PRK: '🇰🇵', PRT: '🇵🇹', PRY: '🇵🇾', QAT: '🇶🇦',
+  ROU: '🇷🇴', RSA: '🇿🇦', RUS: '🇷🇺', SAU: '🇸🇦', SCG: '🇷🇸', SCO: '🏴',
+  SEN: '🇸🇳', SLV: '🇸🇻', SRB: '🇷🇸', SUI: '🇨🇭', SUN: '🇷🇺', SVK: '🇸🇰',
+  SVN: '🇸🇮', SWE: '🇸🇪', TCH: '🇨🇿', TGO: '🇹🇬', TOG: '🇹🇬', TRI: '🇹🇹',
+  TTO: '🇹🇹', TUN: '🇹🇳', TUR: '🇹🇷', UAE: '🇦🇪', UKR: '🇺🇦', URS: '🇷🇺',
+  URU: '🇺🇾', URY: '🇺🇾', USA: '🇺🇸', WAL: '🏴', YUG: '🇷🇸', ZAF: '🇿🇦',
+}
+
+const TEAM_FLAG_IMAGE: Record<string, string> = {
+  ENG: '/flags/gb-eng.svg',
+  WAL: '/flags/gb-wls.svg',
+}
+
+function getFlag(teamCode: string, teamName: string): string {
+  const normalizedName = teamName.toLowerCase()
+  if (normalizedName.includes('west germany') || normalizedName.includes('germany')) return '🇩🇪'
+  if (normalizedName.includes('netherlands')) return '🇳🇱'
+  if (normalizedName.includes('uruguay')) return '🇺🇾'
+  return TEAM_FLAG[teamCode.toUpperCase()] ?? '🏳'
+}
+
+function getFlagImage(teamCode: string, teamName: string): string | undefined {
+  const normalizedName = teamName.toLowerCase()
+  if (normalizedName.includes('england')) return TEAM_FLAG_IMAGE.ENG
+  if (normalizedName.includes('wales')) return TEAM_FLAG_IMAGE.WAL
+  return TEAM_FLAG_IMAGE[teamCode.toUpperCase()]
+}
+
+function FlagMark({ teamCode, teamName }: { teamCode: string; teamName: string }) {
+  const imageSrc = getFlagImage(teamCode, teamName)
+  if (imageSrc) {
+    return (
+      <span
+        aria-label={`${teamName} flag`}
+        role="img"
+        className="h-4 w-6 rounded-[2px] bg-cover bg-center"
+        style={{ backgroundImage: `url(${imageSrc})` }}
+      />
+    )
+  }
+
+  return <span className="text-lg leading-none">{getFlag(teamCode, teamName)}</span>
+}
+
+function getRatingTier(rating: number): {
+  label: string
+  className: string
+  style?: CSSProperties
+} {
+  if (rating >= 92) {
+    return {
+      label: 'Icon',
+      className: 'border-[#f7e7a4]/70 bg-[#f7e7a4]/15 text-[#fff6d6]',
+      style: { boxShadow: 'inset 0 0 18px rgba(255,246,214,0.08)' },
+    }
+  }
+  if (rating >= 87) {
+    return {
+      label: 'Legend',
+      className: 'border-[#5d9cec]/60 bg-[#123b6d]/55 text-[#d8eaff]',
+    }
+  }
+  return {
+    label: 'Hero',
+    className: 'border-[#ef5959]/60 bg-[#681d1d]/55 text-[#ffe0dd]',
+  }
+}
+
+function PlayerPanel({ slot, filledSlots, onConfirm }: PlayerPanelProps) {
   const [players, setPlayers]       = useState<WCPlayer[]>([])
-  const [total, setTotal]           = useState(0)
-  const [context, setContext]       = useState<RandomTeamContext | null>(null)
   const [loading, setLoading]       = useState(false)
+  const [loadError, setLoadError]   = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const fetchRandomTeam = useCallback(
+  const fetchDraftPlayers = useCallback(
     async (pos: string) => {
       setLoading(true)
       setSelectedId(null)
+      setLoadError(null)
       try {
-        const res = await fetch(`/api/players?mode=randomTeam&position=${pos}`)
-        const data = (await res.json()) as RandomTeamResponse
+        const res = await fetch(`/api/players?mode=randomLegends&position=${pos}`)
+        const data = (await res.json()) as DraftPlayersResponse
+        if (!res.ok) {
+          setPlayers([])
+          setLoadError(data.error ?? 'Player pool unavailable')
+          return
+        }
         setPlayers(data.players)
-        setTotal(data.total)
-        setContext(data.context)
+        setLoadError(data.error ?? null)
+      } catch {
+        setPlayers([])
+        setLoadError('Player pool unavailable')
       } finally {
         setLoading(false)
       }
@@ -148,11 +239,11 @@ function PlayerPanel({ slot, filledSlots, showRatingsDuringSelection, onConfirm 
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      fetchRandomTeam(slot.position)
+      fetchDraftPlayers(slot.position)
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [slot.id, slot.position, fetchRandomTeam])
+  }, [slot.id, slot.position, fetchDraftPlayers])
 
   const pickedPlayerIds = new Set(
     Object.entries(filledSlots)
@@ -173,27 +264,12 @@ function PlayerPanel({ slot, filledSlots, showRatingsDuringSelection, onConfirm 
         </span>
       </div>
 
-      {/* Random squad context */}
-      <div className="shrink-0 rounded-lg border border-outline-dim bg-surface-container/60 p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-muted">
-              Random World Cup Squad
-            </p>
-            <p className="mt-1 font-display text-base font-bold uppercase text-on-surface">
-              {context ? `${context.tournamentYear} ${context.teamName}` : 'Drawing squad...'}
-            </p>
-            <p className="text-xs text-on-surface-muted">
-              {total} {slot.position} option{total === 1 ? '' : 's'}
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Player rows */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading ? (
           <PlayerLoading />
+        ) : loadError ? (
+          <p className="text-center text-on-surface-muted text-sm py-8">{loadError}</p>
         ) : players.length === 0 ? (
           <p className="text-center text-on-surface-muted text-sm py-8">No players found</p>
         ) : (
@@ -201,11 +277,7 @@ function PlayerPanel({ slot, filledSlots, showRatingsDuringSelection, onConfirm 
             {players.map((player) => {
               const isChosen = selectedId === player.playerId
               const isAlreadyPicked = pickedPlayerIds.has(player.playerId)
-              const posColor = POSITION_COLOR[player.position]
-              const AWARD_ICON: Record<string, string> = {
-                'Golden Ball': '⭐', 'Golden Boot': '👟',
-                'Golden Glove': '🧤', 'Best Young Player': '🌟',
-              }
+              const tier = getRatingTier(player.rating)
               return (
                 <button
                   key={player.playerId}
@@ -215,43 +287,42 @@ function PlayerPanel({ slot, filledSlots, showRatingsDuringSelection, onConfirm 
                   disabled={isAlreadyPicked}
                   onClick={() => setSelectedId(player.playerId)}
                   className={[
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all duration-150 cursor-pointer text-left',
+                    'grid grid-cols-[2rem_2.5rem_minmax(0,1fr)_3.25rem_auto] items-center gap-2 px-3 py-2.5 rounded-lg border transition-all duration-150 cursor-pointer text-left',
+                    tier.className,
                     isAlreadyPicked
-                      ? 'border-outline-dim bg-surface-high/45 opacity-45 cursor-not-allowed'
+                      ? 'opacity-45 cursor-not-allowed'
                       : isChosen
-                      ? 'border-gold bg-gold/10'
-                      : 'border-outline-dim hover:border-gold/40 hover:bg-surface-container/60',
+                      ? 'border-gold'
+                      : 'hover:border-gold/50',
                   ].join(' ')}
-                  style={isChosen ? { boxShadow: '0 0 0 1px #f2ca50' } : undefined}
+                  style={isChosen ? { ...tier.style, boxShadow: '0 0 0 1px #f2ca50' } : tier.style}
                 >
-                  <span className="font-display font-bold text-gold text-sm w-7 text-right shrink-0">
-                    {showRatingsDuringSelection ? player.rating : '?'}
+                  <span className="flex items-center" title={player.teamName}>
+                    <FlagMark teamCode={player.teamCode} teamName={player.teamName} />
                   </span>
-                  <span
-                    className="text-[10px] font-bold uppercase w-7 shrink-0 text-center"
-                    style={{ color: posColor }}
-                  >
-                    {player.position}
+                  <span className="font-display font-bold text-sm text-right">
+                    {player.rating}
                   </span>
-                  <span className="font-body text-on-surface text-sm flex-1 truncate">
+                  <span className="font-body text-sm truncate" title={`${player.fullName} · ${tier.label}`}>
                     {player.fullName}
                   </span>
+                  <span className="text-xs text-right font-bold tabular-nums">
+                    {player.tournamentYear ?? 'WC'}
+                  </span>
+                  <span className="flex justify-end gap-0.5 min-w-5">
+                    {player.wonTournament && (
+                      <span className="text-xs" title="World Cup Winner">🏆</span>
+                    )}
+                    {player.awards.map((award) => (
+                      <span key={award} className="text-xs" title={award}>
+                        {AWARD_ICON[award] ?? '★'}
+                      </span>
+                    ))}
+                  </span>
                   {isAlreadyPicked && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-muted shrink-0">
+                    <span className="col-span-5 text-[10px] font-bold uppercase tracking-wider text-on-surface-muted">
                       Picked
                     </span>
-                  )}
-                  {player.awards.length > 0 && (
-                    <span className="flex gap-0.5 shrink-0">
-                      {player.awards.map((award) => (
-                        <span key={award} className="text-xs" title={award}>
-                          {AWARD_ICON[award] ?? '★'}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                  {player.wonTournament && player.awards.length === 0 && (
-                    <span className="text-xs shrink-0" title="World Cup Winner">🏆</span>
                   )}
                 </button>
               )
@@ -279,10 +350,8 @@ function PlayerPanel({ slot, filledSlots, showRatingsDuringSelection, onConfirm 
 
 export default function DraftPitch({
   formation,
-  showRatingsDuringSelection,
 }: {
   formation: Formation
-  showRatingsDuringSelection: boolean
 }) {
   const slots = buildSlots(formation)
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
@@ -361,7 +430,6 @@ export default function DraftPitch({
               <PlayerPanel
                 slot={selectedSlot}
                 filledSlots={filledSlots}
-                showRatingsDuringSelection={showRatingsDuringSelection}
                 onConfirm={handleConfirmPick}
               />
             ) : (

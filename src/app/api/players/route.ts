@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { searchPlayersForDraft, getRandomTeamPlayersForDraft, APP_TO_DB } from '@/lib/queries'
+import { searchPlayersForDraft, getRandomLegendPlayersForDraft, APP_TO_DB } from '@/lib/queries'
 import type { Position } from '@/lib/formations'
 
 export async function GET(req: NextRequest) {
@@ -12,12 +12,20 @@ export async function GET(req: NextRequest) {
 
   const dbPosition = APP_TO_DB[position] ?? 'FW'
 
-  if (mode === 'randomTeam') {
-    const result = getRandomTeamPlayersForDraft(dbPosition)
+  try {
+    if (mode === 'randomLegends' || mode === 'randomTeam') {
+      const result = getRandomLegendPlayersForDraft(dbPosition)
+      return NextResponse.json(result)
+    }
+
+    const result = searchPlayersForDraft({ dbPosition, search, page, pageSize })
+
     return NextResponse.json(result)
+  } catch (error) {
+    console.error('Failed to load players', error)
+    return NextResponse.json(
+      { players: [], total: 0, context: null, error: 'Player database unavailable' },
+      { status: 500 },
+    )
   }
-
-  const result = searchPlayersForDraft({ dbPosition, search, page, pageSize })
-
-  return NextResponse.json(result)
 }

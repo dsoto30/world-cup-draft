@@ -5,9 +5,9 @@ import DraftPitch from '@/components/draft-pitch'
 export default async function DraftPage({
   searchParams,
 }: {
-  searchParams: Promise<{ formation?: string; ratings?: string }>
+  searchParams: Promise<{ formation?: string }>
 }) {
-  const { formation: formationId, ratings } = await searchParams
+  const { formation: formationId } = await searchParams
   const formation = formationId ? getFormation(formationId) : undefined
 
   if (!formation) {
@@ -16,7 +16,7 @@ export default async function DraftPage({
 
   return (
     <main className="min-h-screen p-4 md:p-6 flex flex-col">
-      <DraftPitch formation={formation} showRatingsDuringSelection={ratings === 'show'} />
+      <DraftPitch formation={formation} />
     </main>
   )
 }
