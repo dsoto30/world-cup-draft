@@ -1,15 +1,14 @@
-import Database from 'better-sqlite3'
-import path from 'path'
+import { createClient, type Client } from "@libsql/client";
 
-let _db: Database.Database | null = null
+let _client: Client | null = null;
 
-export function getDb(): Database.Database {
-  if (!_db) {
-    _db = new Database(
-      path.join(process.cwd(), 'src/db/worldcup.db'),
-      { readonly: true }
-    )
-    _db.pragma('cache_size = -32000') // 32 MB cache
+export function getDb(): Client {
+  if (!_client) {
+    const url = process.env.TURSO_DATABASE_URL;
+    const authToken = process.env.TURSO_AUTH_TOKEN;
+    if (!url) throw new Error("TURSO_DATABASE_URL is missing");
+    if (!authToken) throw new Error("TURSO_AUTH_TOKEN is missing");
+    _client = createClient({ url, authToken });
   }
-  return _db
+  return _client;
 }

@@ -14,11 +14,11 @@ export async function GET(req: NextRequest) {
 
   try {
     if (mode === 'randomLegends' || mode === 'randomTeam') {
-      const result = getRandomLegendPlayersForDraft(dbPosition)
+      const result = await getRandomLegendPlayersForDraft(dbPosition)
       return NextResponse.json(result)
     }
 
-    const result = searchPlayersForDraft({ dbPosition, search, page, pageSize })
+    const result = await searchPlayersForDraft({ dbPosition, search, page, pageSize })
 
     return NextResponse.json(result)
   } catch (error) {

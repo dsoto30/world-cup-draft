@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed-ratings": "npx tsx scripts/seed-ratings.ts"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.3",
     "@react-three/fiber": "^9.6.1",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.10.0",

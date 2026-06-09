@@ -20,16 +20,16 @@ interface Props {
 export default async function PlayersPage({ searchParams }: Props) {
   const sp = await searchParams
 
-  const tournaments = getTournaments()
+  const tournaments = await getTournaments()
   const defaultTournament = tournaments[0]?.tournament_id ?? 'WC-2022'
   const tournamentId = sp.tournament ?? defaultTournament
   const teamId       = sp.team ?? ''
   const positionCode = sp.position ?? ''  // DB codes: GK/DF/MF/FW
   const search       = sp.search ?? ''
 
-  const teams = getTeamsByTournament(tournamentId)
+  const teams = await getTeamsByTournament(tournamentId)
 
-  const players = getPlayersByTournament({
+  const players = await getPlayersByTournament({
     tournamentId,
     teamId:          teamId || undefined,
     dbPositionCode:  positionCode || undefined,

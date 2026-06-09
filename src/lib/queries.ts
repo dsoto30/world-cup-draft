@@ -348,29 +348,28 @@ const RATING_CTES = `
 
 // ─── Tournaments ──────────────────────────────────────────────────────────────
 
-export function getTournaments(): TournamentRow[] {
-  return getDb()
-    .prepare(
-      `SELECT tournament_id, year, host_country, winner
-       FROM tournaments
-       WHERE year % 4 = 2
-       ORDER BY year DESC`
-    )
-    .all() as TournamentRow[]
+export async function getTournaments(): Promise<TournamentRow[]> {
+  const result = await getDb().execute(
+    `SELECT tournament_id, year, host_country, winner
+     FROM tournaments
+     WHERE year % 4 = 2
+     ORDER BY year DESC`
+  )
+  return result.rows as unknown as TournamentRow[]
 }
 
 // ─── Teams for a tournament ───────────────────────────────────────────────────
 
-export function getTeamsByTournament(tournamentId: string): TeamRow[] {
-  return getDb()
-    .prepare(
-      `SELECT DISTINCT t.team_id, t.team_name, t.team_code
-       FROM squads s
-       JOIN teams t ON t.team_id = s.team_id
-       WHERE s.tournament_id = ?
-       ORDER BY t.team_name`
-    )
-    .all(tournamentId) as TeamRow[]
+export async function getTeamsByTournament(tournamentId: string): Promise<TeamRow[]> {
+  const result = await getDb().execute({
+    sql: `SELECT DISTINCT t.team_id, t.team_name, t.team_code
+          FROM squads s
+          JOIN teams t ON t.team_id = s.team_id
+          WHERE s.tournament_id = ?
+          ORDER BY t.team_name`,
+    args: [tournamentId],
+  })
+  return result.rows as unknown as TeamRow[]
 }
 
 // ─── Players for a tournament (browser page) ─────────────────────────────────
@@ -540,31 +539,29 @@ function toWCPlayer(r: RawRatingRow): WCPlayer {
   }
 }
 
-export function getPlayersByTournament(opts: TournamentPlayerOpts): WCPlayer[] {
+export async function getPlayersByTournament(opts: TournamentPlayerOpts): Promise<WCPlayer[]> {
   const { tournamentId, teamId, dbPositionCode, search } = opts
-  const db = getDb()
 
   let sql = `${ratingSelect()} AND s.tournament_id = @tid`
-  const params: Record<string, string | number> = { tid: tournamentId }
+  const args: Record<string, string | number> = { tid: tournamentId }
 
   if (teamId) {
     sql += ' AND s.team_id = @teamId'
-    params.teamId = teamId
+    args.teamId = teamId
   }
   if (dbPositionCode) {
     sql += ' AND s.position_code = @posCode'
-    params.posCode = dbPositionCode
+    args.posCode = dbPositionCode
   }
   if (search) {
     sql += ' AND (p.family_name LIKE @search OR p.given_name LIKE @search)'
-    params.search = `%${search}%`
+    args.search = `%${search}%`
   }
 
   sql += ' ORDER BY t.team_name, goals DESC, appearances DESC'
 
-  const rows = db.prepare(sql).all(params) as RawRatingRow[]
-
-  return rows.map(toWCPlayer)
+  const result = await getDb().execute({ sql, args })
+  return (result.rows as unknown as RawRatingRow[]).map(toWCPlayer)
 }
 
 // ─── Draft slot search: best tournament card per player, all men's WCs ───────
@@ -576,24 +573,21 @@ interface SearchOpts {
   pageSize?: number
 }
 
-export function searchPlayersForDraft(opts: SearchOpts): {
+export async function searchPlayersForDraft(opts: SearchOpts): Promise<{
   players: WCPlayer[]
   total: number
-} {
+}> {
   const { dbPosition, search = '', page = 1, pageSize = 6 } = opts
-  const db = getDb()
   const searchPct = search ? `%${search}%` : null
 
-  // All per-tournament rows for this position across men's World Cups.
   const sql = `
     ${ratingSelect()}
       AND s.position_code = @dbPosition
       AND (@searchPct IS NULL OR p.family_name LIKE @searchPct OR p.given_name LIKE @searchPct)
   `
 
-  const rows = db
-    .prepare(sql)
-    .all({ dbPosition, searchPct }) as RawRatingRow[]
+  const result = await getDb().execute({ sql, args: { dbPosition, searchPct } })
+  const rows = result.rows as unknown as RawRatingRow[]
 
   // Compute rating per row, keep each player's best tournament
   const bestByPlayer = new Map<string, { player: WCPlayer; rating: number }>()
@@ -619,21 +613,18 @@ export function searchPlayersForDraft(opts: SearchOpts): {
   return { players, total }
 }
 
-export function getRandomLegendPlayersForDraft(dbPosition: string): {
+export async function getRandomLegendPlayersForDraft(dbPosition: string): Promise<{
   players: WCPlayer[]
   total: number
   context: null
-} {
-  const db = getDb()
-  const rows = db
-    .prepare(
-      `${ratingSelect()}
-       AND s.position_code = @dbPosition
-       ORDER BY RANDOM()`
-    )
-    .all({
-      dbPosition,
-    }) as RawRatingRow[]
+}> {
+  const result = await getDb().execute({
+    sql: `${ratingSelect()}
+          AND s.position_code = @dbPosition
+          ORDER BY RANDOM()`,
+    args: { dbPosition },
+  })
+  const rows = result.rows as unknown as RawRatingRow[]
 
   const bestByPlayer = new Map<string, WCPlayer>()
 

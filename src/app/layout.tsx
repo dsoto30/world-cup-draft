@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${anybody.variable} ${hanken.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${anybody.variable} ${hanken.variable}`}>
       <body className="min-h-screen bg-surface text-on-surface antialiased">
         {children}
       </body>
