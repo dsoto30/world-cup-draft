@@ -23,11 +23,11 @@ export default async function PlayersPage({ searchParams }: Props) {
   const tournaments = await getTournaments()
   const defaultTournament = tournaments[0]?.tournament_id ?? 'WC-2022'
   const tournamentId = sp.tournament ?? defaultTournament
-  const teamId       = sp.team ?? ''
-  const positionCode = sp.position ?? ''  // DB codes: GK/DF/MF/FW
+  const positionCode = sp.position ?? ''
   const search       = sp.search ?? ''
 
   const teams = await getTeamsByTournament(tournamentId)
+  const teamId = sp.team ?? teams[0]?.team_id ?? ''
 
   const players = await getPlayersByTournament({
     tournamentId,
